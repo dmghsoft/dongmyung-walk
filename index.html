@@ -1,0 +1,1304 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>동명 산책</title>
+<style>
+@font-face{font-family:'Pretendard';font-weight:300;font-display:block;src:url('fonts/Pretendard-Light.woff2') format('woff2')}
+@font-face{font-family:'Pretendard';font-weight:500;font-display:block;src:url('fonts/Pretendard-Medium.woff2') format('woff2')}
+@font-face{font-family:'Pretendard';font-weight:700;font-display:block;src:url('fonts/Pretendard-Bold.woff2') format('woff2')}
+@font-face{font-family:'NanumMyeongjo';font-weight:700;font-display:block;src:url('fonts/NanumMyeongjo-Bold.ttf') format('truetype')}
+:root{--bg:#FEEFE7;--paper:#F2EFE6;--muted:rgba(242,239,230,.62);--line:rgba(242,239,230,.18);--c4:#F5C518;
+  --sans:'Pretendard','Malgun Gothic',sans-serif;--serif:'NanumMyeongjo','Batang',serif}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;touch-action:none;overscroll-behavior:none}
+body{background:var(--bg);font-family:var(--sans);font-weight:300;user-select:none;-webkit-user-select:none;position:relative}
+/* 그림은 화면 전체, 버튼은 그 위에 반투명으로 떠 있음 */
+#stage{position:absolute;inset:0;overflow:hidden;cursor:grab}
+#stage.drag{cursor:grabbing}
+/* 그림과 학생이 함께 움직이는 판 — 좌표는 그림 가로 1536 기준 */
+#world{position:absolute;left:0;top:0;width:1536px;height:1024px;transform-origin:0 0}
+/* 그림 가장자리를 바탕색으로 부드럽게 녹여 경계선이 보이지 않게 */
+#world #pic{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none;
+  /* 좌우 폭은 1.5%만 — 9%였을 때 받침대 왼쪽 나무까지 흐려져 그 위 가림 조각과 어긋나 보였음 */
+  -webkit-mask:linear-gradient(90deg,transparent,#000 1.5%,#000 98.5%,transparent),linear-gradient(transparent,#000 4%,#000 96%,transparent);
+  -webkit-mask-composite:source-in;mask-composite:intersect}
+/* 학생 크기 — 큰 화면 전체 모습에서도 알아보이게 건물 한 층보다 조금 작게 */
+/* 학생 — ChatGPT로 만든 그림을 동작별 칸(작은동명/학생_*_칸.png)으로 나눠 씁니다. 발끝이 기준점 */
+.kid{position:absolute;left:0;top:0;pointer-events:none}
+.kid .spr{position:absolute;left:0;bottom:0;width:100%;height:100%;background-repeat:no-repeat;background-size:700% 100%}
+.kid .shadow{position:absolute;left:18%;bottom:-6%;width:64%;height:12%;border-radius:50%;background:rgba(90,50,30,.22)}
+.kid.hop .spr{animation:hop .8s ease-out}
+/* 삼색 고양이 — 칸 그림 9장 */
+.cat{position:absolute;left:0;top:0;pointer-events:none;transition:opacity .6s}
+/* 옛 동명 선배 — 나타나고 사라질 때 서서히. 옛날 교복 그림이 아직 없으면 지금 학생 그림을 빛바랜 사진 색으로 */
+.kid{transition:opacity .8s}
+/* 체육대회 머리띠 — 청팀 파랑, 백팀 흰색 */
+.kid .band{position:absolute;left:25%;top:10%;width:50%;height:4.5%;border-radius:99px;pointer-events:none}
+.kid .band.b0{background:#2f6fd6}
+.kid .band.b1{background:#fff;box-shadow:0 0 0 .5px rgba(0,0,0,.35)}
+/* 계절 소품 — 발끝(아래 가운데)이 놓을 자리. 눌렀을 때 살짝 흔들림 */
+.prop{position:absolute;transform:translate(-50%,-100%);pointer-events:none;transform-origin:50% 100%}
+.prop.wig{animation:wig .6s ease-out}
+@keyframes wig{0%,100%{transform:translate(-50%,-100%) rotate(0)}25%{transform:translate(-50%,-100%) rotate(-6deg)}60%{transform:translate(-50%,-100%) rotate(4deg)}}
+.prop.xmas{animation:twinkle 2.4s ease-in-out infinite}
+@keyframes twinkle{0%,100%{filter:brightness(1)}50%{filter:brightness(1.18) saturate(1.15)}}
+/* 날아다니는 나비·잠자리와 참새 — 위치는 스크립트, 날갯짓은 CSS */
+.critter{position:absolute;left:0;top:0;pointer-events:none;transition:opacity .5s}
+.critter img{display:block;width:100%;height:100%}
+.critter.flap img{animation:flap .18s ease-in-out infinite alternate}
+@keyframes flap{to{transform:scaleX(.45)}}
+/* 흩날리는 꽃잎·낙엽·눈 — 화면 위에서 천천히. transform·opacity 만 움직여 가볍게 */
+#fall{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:2}
+#fall i{position:absolute;top:-3vw;display:block;animation:fall linear infinite}
+@keyframes fall{0%{transform:translate3d(0,0,0) rotate(0)}100%{transform:translate3d(var(--dx),110vh,0) rotate(var(--rot))}}
+.kid.old .spr{filter:sepia(.75) saturate(.7) brightness(.95)}
+.cat .spr{position:absolute;left:0;bottom:0;width:100%;height:100%;background-repeat:no-repeat;background-size:900% 100%}
+.cat .shadow{position:absolute;left:15%;bottom:-6%;width:70%;height:14%;border-radius:50%;background:rgba(90,50,30,.22)}
+/* 깡충 — transform 대신 translate 만 움직임. transform 을 쓰면 오른쪽을 보게 뒤집어 둔 그림(scaleX(-1))이 점프하는 동안 풀려 왼쪽을 봤음 (2026-10-25) */
+@keyframes hop{0%{translate:0 0}25%{translate:0 -28%}50%{translate:0 0}70%{translate:0 -12%}100%{translate:0 0}}
+.head{position:absolute;left:2vw;top:1.6vw;pointer-events:none;padding:1vw 1.6vw 1.1vw;border-radius:1vw;
+  background:rgba(255,255,255,.75);color:#12357F;box-shadow:0 .4vw 1.4vw rgba(60,30,20,.16);z-index:3}
+.head h1{font-family:var(--serif);font-weight:700;font-size:2.6vw;letter-spacing:.1em}
+.head p{margin-top:.5vw;font-size:1.3vw;opacity:.92}
+/* 말풍선 글자는 모두 1.3vw(약 16mm)로 통일, 최대 폭 19vw — 긴 말은 두 줄, 낱말 중간에서 끊지 않음.
+   말·혼잣말·맞장구는 글자 크기가 아니라 모양(꼬리·글자색)으로만 구분 */
+.bub{position:absolute;transform:translate(-50%,-100%);pointer-events:none;width:max-content;max-width:19vw;text-align:center;
+  word-break:keep-all;line-height:1.35;z-index:2;
+  padding:.7vw 1.2vw;border-radius:1.2vw;background:#fff;color:#1b2440;font-size:1.3vw;font-weight:500;
+  box-shadow:0 .5vw 1.5vw rgba(0,0,0,.2);transition:opacity .3s linear}
+.bub.sm{padding:.55vw 1vw}
+.bub.notail::after{display:none}              /* 체육대회 승리 발표처럼 누가 말하는 게 아닌 말풍선 */
+/* 혼잣말 — 생각 풍선: 흐린 글자, 꼬리 대신 작은 동그라미 두 개 */
+.bub.think{color:#4a5170;border-radius:1.6vw;background:rgba(255,255,255,.93)}
+.bub.think::after,.bub.think::before{content:'';position:absolute;left:50%;border:0;border-radius:50%;background:rgba(255,255,255,.93);
+  box-shadow:0 .2vw .5vw rgba(0,0,0,.15)}
+.bub.think::after{bottom:-.75vw;width:.75vw;height:.75vw;margin-left:-.15vw}
+.bub.think::before{bottom:-1.25vw;width:.4vw;height:.4vw;margin-left:.35vw}
+/* 고양이가 짜증 나서 달아날 때 머리 위에 뜨는 만화식 꼬불꼬불 낙서 뭉치 (말풍선 없이) */
+/* 말풍선 안에 꼬불꼬불 낙서, 그 오른쪽 위에 작은 빨간 핏줄 표시(💢) */
+.bub.grr{padding:.75vw 1.05vw .6vw .9vw}
+.grr svg{display:block;width:2.6vw;animation:grr .16s steps(2) infinite}
+/* ChatGPT 짜증 말풍선 그림(작은동명/짜증_1.png 핏줄, 짜증_2.png 낙서, 짜증_3.png 화난 고양이 얼굴) — 그림 자체에 말풍선·꼬리가 있어 바탕·꼬리를 뺌 */
+.bub.grrimg{background:none;box-shadow:none;padding:0}
+.bub.grrimg::after{display:none}
+.bub.grrimg img{display:block;width:4.4vw;animation:grr .18s steps(2) infinite}
+.grr svg.vein{position:absolute;right:.8vw;top:.5vw;width:1.05vw;animation-duration:.22s}
+@keyframes grr{0%{transform:rotate(-6deg) translate(-2%,0)}100%{transform:rotate(6deg) translate(2%,-3%)}}
+.bub::after{content:'';position:absolute;left:50%;bottom:-.9vw;margin-left:-.8vw;border:.8vw solid transparent;border-top-color:#fff;border-bottom:0}
+.lab{position:absolute;transform:translate(-50%,-100%) scale(.6);pointer-events:none;white-space:nowrap;z-index:2;
+  padding:.7vw 1.5vw;border-radius:99vw;background:#fff;color:#12357F;font-size:1.6vw;font-weight:700;
+  box-shadow:0 .5vw 1.5vw rgba(0,0,0,.22);opacity:0;transition:opacity .25s,transform .3s cubic-bezier(.3,1.6,.5,1)}
+.lab.on{opacity:1;transform:translate(-50%,-100%) scale(1)}
+
+/* 아래 떠 있는 버튼들 — 흰색 75% 반투명 (뒤 흐림 효과는 4K에서 무거워서 쓰지 않음) */
+.reach{position:absolute;left:2vw;right:2vw;bottom:1.4vw;display:flex;align-items:center;gap:1vw;pointer-events:none;z-index:4}
+.reach>*{pointer-events:auto}
+.glass{background:rgba(255,255,255,.75);box-shadow:0 .4vw 1.4vw rgba(60,30,20,.16);color:#12357F}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+.btn{padding:1.5vw 2.6vw;border-radius:99vw;font-size:1.5vw;font-weight:500;white-space:nowrap}
+.btn:active,.chips button:active{background:rgba(255,255,255,.95)}
+.grp{display:flex;align-items:center;gap:.7vw;padding:.6vw .7vw .6vw 1.6vw;border-radius:99vw}
+.grp .lb{font-size:1.15vw;font-weight:500;color:rgba(18,53,127,.7);margin-right:.3vw}
+.chips{display:flex;gap:.6vw}
+.chips button{padding:1.1vw 1.9vw;border-radius:99vw;font-size:1.3vw;font-weight:500;color:#12357F}
+.chips button.sel{background:var(--c4);color:#221a08;font-weight:700}
+.chips button[disabled]{opacity:.35}
+.spacer{flex:1}
+/* 소나기 — 화면을 살짝 어둡게 하고 비스듬한 빗줄기 */
+#rain{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:2;opacity:0;transition:opacity 1.5s;background:rgba(60,75,110,.24)}
+#rain.on{opacity:1}
+#rain i{position:absolute;top:-12vh;width:.16vw;height:4.5vw;background:linear-gradient(transparent,rgba(150,180,225,.95));
+  transform:rotate(12deg);animation:rainfall linear infinite}
+@keyframes rainfall{to{transform:translate3d(-14vh,125vh,0) rotate(12deg)}}
+/* 눈싸움 눈뭉치 — 그림 좌표(#world) 안에서 날아감 */
+.snowball{position:absolute;left:0;top:0;width:3.2px;height:3.2px;border-radius:50%;background:#fff;
+  box-shadow:0 0 0 .35px rgba(110,130,170,.7);pointer-events:none}
+/* 숨은 재미 발견 알림 — 조작줄 바로 위 가운데에 잠깐 */
+#toast{position:absolute;left:50%;bottom:8.6vw;transform:translate(-50%,1vw);padding:1vw 2.2vw;border-radius:99vw;
+  font-size:1.5vw;font-weight:700;white-space:nowrap;opacity:0;pointer-events:none;z-index:5;transition:opacity .3s,transform .3s}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+/* 숨은 재미 찾은 수 — 오른쪽 위 구석. 찾을 때마다 점이 하나씩 채워지고 살짝 커졌다 돌아옴 (2026-10-29 사용자 요청: 도전 의식) */
+#funs{position:absolute;right:2vw;top:1.6vw;z-index:3;pointer-events:none;padding:1vw 1.6vw 1.1vw;border-radius:1vw;text-align:right}
+#funs .t{font-size:1.3vw;font-weight:500;color:rgba(18,53,127,.8)}
+#funs .t b{font-family:var(--serif);font-size:2.4vw;font-weight:700;color:#12357F;margin:0 .3vw 0 .5vw}
+#funs .dots{display:flex;gap:.45vw;justify-content:flex-end;margin-top:.5vw}
+#funs .dots i{width:.9vw;height:.9vw;border-radius:50%;border:.15vw solid rgba(18,53,127,.45)}
+#funs .dots i.on{background:var(--c4);border-color:#d9a400}
+#funs.pop{animation:pop .6s ease-out}
+@keyframes pop{30%{transform:scale(1.15)}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="world"><img id="pic" src="작은동명/봄.jpg" alt="동명 학교 모형"></div>
+  <div class="head"><h1>동명 산책</h1><p>학생이나 건물을 눌러 보세요</p></div>
+  <div id="funs" class="glass"><div class="t">숨은 재미<b id="funN">0</b>/ <span id="funAll">8</span> 찾음</div><div class="dots" id="funDots"></div></div>
+  <div id="fall"></div>
+</div>
+<div class="reach" id="reach">
+  <button class="btn glass" onclick="viewHome()">처음 모습</button>
+  <div class="spacer"></div>
+  <div class="grp glass"><span class="lb">계절</span><div class="chips" id="seasons"></div></div>
+  <div class="spacer"></div>
+  <button class="btn glass" id="closeBtn">닫기</button>
+</div>
+<div id="toast" class="glass"></div>
+
+<script src="작은동명/학생.js"></script>
+<script src="작은동명/가림.js"></script>
+<script src="작은동명/고양이.js"></script>
+<script>
+/* ═══ 동명 산책 (2026-10-30 '작은 동명 산책'에서 이름 바꿈. 그림 폴더 이름 '작은동명'은 그대로) ═══
+   ChatGPT로 만든 계절별 학교 그림(작은동명/봄·여름·가을·겨울.jpg, 6144×4096) 위에 학생·고양이·소품이 움직입니다.
+   좌표는 그림을 가로 1536으로 본 기준입니다. 파일 역할·숨은 재미 목록은 작은동명/작업정리.md */
+const $=id=>document.getElementById(id);
+let seed=11;const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;
+const pick=a=>a[Math.floor(rnd()*a.length)];
+
+/* ── 걷는 길 — 그림의 보도를 따라 이은 점들 ── */
+const NODES={
+  a1:[262,212],a2:[290,236],a3:[330,288],a4:[400,322],a5:[455,372],a6:[500,420],a7:[545,470],a8:[600,525],
+  a9:[660,575],a10:[722,624],a11:[762,642],a12:[860,702],
+  b1:[215,578],b2:[330,556],b3:[440,535],b4:[560,515],
+  d1:[940,668],d2:[1020,634],d3:[1100,601],d4:[1175,570],d5:[1240,545],d6:[1180,500],d7:[1135,470],
+  e1:[1265,588],e2:[1270,628],e3:[1200,660],e4:[1120,700],e5:[1040,740],e6:[980,772],
+  f1:[872,738],f2:[902,772],f3:[942,802],f4:[985,834],
+};
+const EDGES='a1-a2 a2-a3 a3-a4 a4-a5 a5-a6 a6-a7 a7-a8 a8-a9 a9-a10 a10-a11 b1-b2 b2-b3 b3-b4 b4-a8 '+
+  'a12-d1 d1-d2 d2-d3 d3-d4 d4-d5 d5-d6 d6-d7 d5-e1 e1-e2 e2-e3 e3-e4 e4-e5 e5-e6 a12-f1 f1-f2 f2-f3 f3-f4 e6-f3';
+const NB={};EDGES.split(' ').forEach(e=>{const [a,b]=e.split('-');(NB[a]=NB[a]||[]).push(b);(NB[b]=NB[b]||[]).push(a)});
+/* 운동장 — 기울어진 타원 안 (조회대 둘레는 빼고) */
+const FIELD={cx:870,cy:478,a:200,b:78,ang:21.3*Math.PI/180};
+/* 조회대(뾰족한 지붕) 자리 — 학생 발이 이 안에 들어가면 지붕 앞에 그려져 어색하므로 아예 지나가지 않게.
+   그림의 조회대보다 조금 넉넉하게 잡은 다각형 */
+const STAGE=[[676,440],[800,432],[868,515],[866,628],[796,634],[674,532]];
+function inStage(x,y){let c=false;for(let i=0,j=STAGE.length-1;i<STAGE.length;j=i++){const [xi,yi]=STAGE[i],[xj,yj]=STAGE[j];
+  if((yi>y)!==(yj>y)&&x<(xj-xi)*(y-yi)/(yj-yi)+xi)c=!c}return c}
+function crossesStage(x1,y1,x2,y2){const n=Math.ceil(Math.hypot(x2-x1,y2-y1)/1.5);
+  for(let i=0;i<=n;i++)if(inStage(x1+(x2-x1)*i/n,y1+(y2-y1)*i/n))return true;return false}
+/* 운동장 안 목적지 — 조회대 자리가 아니고, (지금 위치가 있으면) 가는 길이 조회대를 가로지르지 않는 곳 */
+function fieldSpot(fx,fy){
+  for(let tries=0;;tries++){if(fx!==undefined&&tries>300)return [fx,fy];      /* 못 찾으면 제자리 */
+    const t=rnd()*6.283,r=Math.sqrt(rnd()),u=Math.cos(t)*FIELD.a*r,v=Math.sin(t)*FIELD.b*r;
+    const x=FIELD.cx+u*Math.cos(FIELD.ang)-v*Math.sin(FIELD.ang),y=FIELD.cy+u*Math.sin(FIELD.ang)+v*Math.cos(FIELD.ang);
+    if(inStage(x,y))continue;
+    if(fx!==undefined&&crossesStage(fx,fy,x,y))continue;
+    return [x,y]}
+}
+
+/* ── 건물 이름 — 누르는 영역 [이름, x0,y0,x1,y1] (작은 것부터 찾음) ── */
+/* 운동장·조회대·스탠드는 이름을 띄우지 않음 (사용자 요청). 6번째 값 = 이름표 아래끝 y (없으면 위끝+10) */
+const SPOTS=[['기념관',95,355,195,445],['설립자 이운정 선생님 동상',620,235,675,340],['운연동산',600,225,720,360],
+  ['경영고',540,655,855,935],['향상관',1210,280,1500,530,405],['성실관',335,30,700,262,150],['봉사관',700,0,910,330,150],
+  ['창조관',910,70,1262,400,235],['새솔관',244,594,350,706]];   /* 새솔관 — 왼쪽 아래 작은 건물 (2026-10-24 사용자 알려줌) */
+const labs=SPOTS.map(([t])=>{const d=document.createElement('div');d.className='lab';d.textContent=t;$('stage').appendChild(d);return d});
+const labUntil=SPOTS.map(()=>0);
+
+/* ── 학생 — 머리 모양 3가지(단발·긴머리·묶음), 봄·여름 교복 ──
+   칸 순서: 0 서기, 1·2 앞모습 걷기, 3·4 뒷모습 걷기, 5 손 흔들기, 6 앉기.
+   ChatGPT 그림의 1번은 왼쪽 아래, 2번은 오른쪽 아래, 3·4번은 오른쪽 위를 보고 걸어서 좌우를 뒤집어 맞춥니다. */
+/* 머리 모양 3가지. 가을·겨울에는 같은 머리의 동복 그림('겨울'+이름)으로 갈아입습니다 */
+const ART=window.KIDART,STYLES=['단발','긴머리','묶음'];
+/* 선생님 그림 — 학생과 같은 10칸 (작은동명/교사_남·여_칸.png, 원본은 교사_작업/). 계절과 관계없이 같은 옷 (2026-10-29) */
+ART['교사남']={src:'작은동명/교사_남_칸.png',cw:120,ch:200,n:10};ART['교사여']={src:'작은동명/교사_여_칸.png',cw:120,ch:200,n:10};
+const WINTERY=s=>s==='가을'||s==='겨울';
+/* 친구 찾기 '가방 멘 친구'(st '가방') — 동복 그림(겨울가방)이 오기 전에는 가을·겨울에 하복 차림이 섞이지 않게 숨김(k.off) */
+const isOff=k=>k.st==='가방'&&WINTERY(SEA)&&!ART['겨울가방'];
+const BAGSAY=['찾았다! 내가 가방 멘 친구야!','들켰네! 남색 가방 멋지지?','나 찾았어? 눈썰미 최고다!'];
+const KH=34;                                   /* 학생 키 (그림 기준 px, 원근 배율 전) */
+/* 계절에 맞는 교복으로 갈아입히기 */
+function dress(k){
+  k.off=isOff(k);k.el.style.visibility=k.off?'hidden':'';if(k.off&&k.bub){k.bub.remove();k.bub=null}
+  const A=ART[(WINTERY(SEA)&&ART['겨울'+k.st]?'겨울':'')+k.st],w=(k.h||KH)*A.cw/A.ch;
+  k.el.style.width=w+'px';k.el.style.marginLeft=(-w/2)+'px';k.spr.style.backgroundImage=`url('${encodeURI(A.src)}')`;
+  k.n=A.n||7;k.spr.style.backgroundSize=`${k.n*100}% 100%`;const f=k.fi;k.fi=-1;if(f>=0)setFrame(k,f,k.ff);
+}
+/* 칸 수(k.n)는 그림마다 — 뒷모습 서기·걷기(칸 7~9)가 있으면 10칸 */
+function setFrame(k,i,flip){
+  if(k.fi===i&&k.ff===flip)return;k.fi=i;k.ff=flip;
+  k.spr.style.backgroundPosition=`${i*100/(k.n-1)}% 0`;k.spr.style.transform=flip?'scaleX(-1)':'';
+}
+/* 학생을 눌렀을 때 하는 말 — 누른 사람에게 건네는 친근한 해요체 (사용자가 준 20가지 + 동명 인사 2가지) */
+/* 요즘 여고생 말투 — 물결표(~)·'헤헤' 없이 느낌표·물음표로. 관람객에게도 친근한 반말 (2026-10-24 사용자 요청) */
+const SAY=['앗, 방금 나 불렀어?','어? 나랑 눈 마주쳤지?','간지러워! 왜 자꾸 콕 찔러?','아 깜짝아! 터치해서 놀랐잖아!',
+  '무슨 일 있어? 길 알려줄까?','심심해서 눌러본 거지!','자꾸 누르면 어지러워!',
+  '오늘 기분 좋은 일 있나 봐!','나한테 궁금한 거 있어?','방금 지나가려는데 딱 잡혔네!','인사해줘서 고마워, 좋은 하루 보내!',
+  '엥? 또 나 눌렀네! 반가워','나 지금 이동 수업 가야 하는데, 잠깐만!','화면 너머로 손인사! 안녕!','누가 불렀나 했더니, 거기 있었네!',
+  '오늘 하루도 파이팅!','살짝 터치해줘야 안 아파!','학교 구경 재밌게 하고 있어?','나 부른 거 맞지? 무슨 일이야?',
+  '동명 화이팅!',   /* '지금 바쁜데... 딱 3초만 멈춰줄게!'·'동명 100주년 축하해!'는 사용자 요청으로 뺌(100주년 축하는 옛 선배만) (2026-10-26) */
+  /* 위로의 말 (사용자가 준 10가지를 반말로) */
+  '오늘도 아침 일찍 학교 오느라 고생 많았어!','지금도 충분히 잘하고 있으니까 너무 걱정 마!',
+  '지칠 땐 잠깐 쉬어가도 괜찮아. 내가 응원할게!','오늘 힘든 일 있었어? 이 터치 한 번으로 다 날아가라, 얍!',
+  '남들이랑 비교하지 말기! 지금 모습 그대로도 충분히 멋져','혹시 고민 있어? 내일은 오늘보다 훨씬 더 좋은 날일 거야',
+  '오늘 급식에 네가 좋아하는 메뉴 나왔으면 좋겠다!','오늘 웃은 일 하나만 떠올려 봐. 그거면 충분해','지금 이 순간도 나중엔 좋은 추억이 될 거야'];
+  /* 3·4·8·10번(숨 크게 쉬어 / 성적이 전부는 아님 / 제일 소중한 건 너 / 묵묵히 버티는 것) 은 사용자가 마음에 안 든다고 해서 뺌 */
+const kids=[];
+function makeKid(mode,pos,style){
+  const st=style||STYLES[kids.length%STYLES.length],A=ART[(WINTERY(SEA)&&ART['겨울'+st]?'겨울':'')+st],w=KH*A.cw/A.ch;
+  const el=document.createElement('div');el.className='kid';
+  el.style.cssText=`width:${w}px;height:${KH}px;margin:${-KH}px 0 0 ${-w/2}px`;
+  el.innerHTML=`<i class="shadow"></i><div class="spr" style="background-image:url('${encodeURI(A.src)}');background-size:${(A.n||7)*100}% 100%"></div>`;
+  $('world').appendChild(el);
+  const k={el,st,n:A.n||7,spr:el.querySelector('.spr'),mode,x:pos[0],y:pos[1],tx:pos[0],ty:pos[1],node:null,prev:null,wait:rnd()*3,
+    speed:16+rnd()*8,face:-1,ph:rnd(),react:0,bub:null,fi:-1};
+  setFrame(k,mode==='wave'?5:mode==='sit'?6:0,false);
+  kids.push(k);return k;
+}
+function scaleAt(y){return .78+.42*(y/1024)}          /* 멀리(위쪽)는 작게, 가까이는 크게 */
+function place(k){
+  const s=scaleAt(k.y);
+  k.el.style.transform=`translate(${k.x}px,${k.y}px) scale(${s})`;
+  k.el.style.zIndex=Math.round(k.y);
+}
+/* 앞쪽 나무·가로등 — 그림에서 오려 낸 조각을 제자리에 다시 얹습니다.
+   뿌리(줄기 바닥)가 학생 발보다 아래(관람자 쪽)에 있으면 학생을 가립니다. */
+/* 벤치 — [놓을 자리 x, 바닥 y], 폭 BW(그림 px), 높이/폭 비 BR. 앉은 학생은 바닥에서 SITDX·SITDY 만큼 앞에 */
+/* 왼쪽 벤치는 꽃덤불 아래 빈 잔디로, 오른쪽 벤치는 꽃덤불에서 10px 오른쪽으로 — 전엔 끝이 덤불에 겹쳤음 (2026-10-25) */
+const BENCHES=[[622,385],[726,333]],BW=30,BR=215/240,SITDX=1,SITDY=1;
+/* 계절 — 그림과 가림 조각을 계절별로 바꿉니다. 처음에는 지금 달의 계절로 */
+const SEAS=['봄','여름','가을','겨울'];
+/* 오늘 날짜의 계절 — 3~5월 봄, 6~8월 여름, 9~11월 가을, 12~2월 겨울. 열 때와 1분 동안 안 만졌을 때 이 계절로 */
+const todaySeason=()=>{const m=new Date().getMonth();return SEAS[[11,0,1].includes(m)?3:Math.floor((m-2)/3)]};
+let SEA=todaySeason();
+function setSeason(s){
+  SEA=s;$('pic').src='작은동명/'+s+'.jpg';
+  /* 화면 바탕을 그 계절 그림의 바깥 배경색으로 — 그림 좌우 끝선이 보이지 않게 */
+  document.body.style.background={봄:'#fdf5f0',여름:'#fff6ef',가을:'#fef0e7',겨울:'#f8f7fc'}[s];
+  for(const k of kids)dress(k);
+  document.querySelectorAll('#world .occ').forEach(e=>e.remove());buildOccluders();buildProps();buildFall();
+  document.querySelectorAll('#seasons button').forEach(b=>b.classList.toggle('sel',b.textContent===s));
+  /* 계절을 바꾸면 그 계절에 없는 놀이는 마무리 — 겨울엔 소나기 없음, 겨울이 아니면 눈사람·눈싸움 없음 (2026-10-25) */
+  if(rain&&s==='겨울'&&rain.phase==='run')rain.t=99;
+  if(snow&&s!=='겨울'&&snow.phase!=='back'){snow.balls.forEach(b=>b.el.remove());snow.balls=[];snow.phase='back';endGame(snow.L)}
+}
+/* 손으로 잡은 가림 조각 — stageocc.py 로 생성
+   (occluders.py 를 다시 돌리면 가림/계절 폴더가 비워지므로 stageocc.py 도 다시 돌릴 것)
+   조회대: 체육대회 선수가 트랙 왼쪽 아래(조회대 뒤)를 지날 때 가려지게
+   경영고: 건물 뒤 보도 끝(a11) 근처 학생이 지붕 위에 올라선 것처럼 보이지 않게 (2026-10-24)
+   ※ 지붕 모서리를 따라가던 a11→a12 길은 지붕 위를 걷는 것처럼 보이고 그림 길도 일그러진 곳이라 없앰 — a11 은 보도 안쪽 막다른 끝 */
+const EXTRAOCC=[['조회대.png',673,447,189,185,632],['경영고.png',543,655,309,290,700]];
+/* 차양 — 지붕과 앞 기둥 (stageocc.py 가 만듦). 지붕이 비스듬해서 한 장으로는 바닥 y 를 정할 수 없어, 6px 띠로 나눠
+   띠마다 앞 기둥 바닥선(CANOPY_YF)+2 를 바닥 y 로 씀 → 지붕 아래(안쪽) 학생만 가려지고 기둥 앞에 선 학생은 앞에 그려짐.
+   띠는 7px 로 1px 씩 겹쳐 붙임 (딱 맞추면 이음매에 가는 세로줄이 비침) (2026-10-25) */
+const CANOPYOCC=['차양.png',822,232,324,204],CANOPY_YF=x=>285.75+(x-842)*.594;
+function buildOccluders(){
+  for(const [fn,x,y,w,h,base] of [...((window.OCCL||{})[SEA]||[]),...EXTRAOCC.map(([f,...r])=>[SEA+'/'+f,...r])]){
+    const im=document.createElement('img');im.className='occ';im.src='작은동명/가림/'+fn;
+    im.style.cssText=`position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${h}px;z-index:${base};pointer-events:none`;
+    $('world').appendChild(im);
+  }
+  const [f,cx,cy,cw,ch]=CANOPYOCC,src=encodeURI(`작은동명/가림/${SEA}/${f}`);
+  for(let x=cx;x<cx+cw;x+=6){const d=document.createElement('div');d.className='occ';
+    d.style.cssText=`position:absolute;left:${x}px;top:${cy}px;width:7px;height:${ch}px;overflow:hidden;pointer-events:none;z-index:${Math.round(CANOPY_YF(x+3)+2)}`;
+    d.innerHTML=`<img src="${src}" alt="" style="position:absolute;left:${cx-x}px;top:0;width:${cw}px;height:${ch}px">`;$('world').appendChild(d)}
+}
+/* ── 계절 소품 (ChatGPT 그림 → 작은동명/소품/, props.py·propmap.py 로 자름) ──
+   [파일, 발끝 x, 발끝 y, 높이(학생 키 배수), 종류]. 종류: bird 참새(깡충, 누르면 날아감), fly 나비·잠자리(맴돎), xmas 트리(반짝임)
+   자리는 학생 길·나무와 겹치지 않는 풀밭: 운동장 옆(1060,588), 오른쪽 길 사이(1150,660)(1235,725), 왼쪽 아래(500,745) */
+const PROPS={
+  /* 봄·여름·가을의 꽃·화분·수돗가·빗자루 등은 그림과 어울리지 않아 뺌(사용자 요청). 나비는 그림 속 꽃밭 둘레로 */
+  봄:[['봄_4_0',478,744,.3,'bird'],['봄_4_1',506,754,.3,'bird'],['봄_4_2',532,740,.3,'bird'],
+    ['봄_3_0',1070,668,.26,'fly'],['봄_3_1',930,625,.26,'fly']],
+  여름:[/* 해바라기는 어울리지 않아 뺌(사용자 요청) */
+    ['여름_4_0',1000,560,.3,'fly'],['여름_4_1',880,690,.3,'fly']],
+  가을:[['가을_0',500,745,.5],
+    ['가을_4_0',940,615,.3,'fly'],['가을_4_1',1150,705,.3,'fly']],
+  /* 눈사람은 동상 오른쪽 벤치 학생의 오른쪽, 넉가래 눈더미는 왼쪽 벤치 학생의 왼쪽 아래(7시) 눈 위 */
+  겨울:[['겨울_0',755,331,1.05],['겨울_4',1150,660,.75],['겨울_2',586,401,1],/* 눈오리 세 마리 — 그림 길 방향(오른쪽 아래↔왼쪽 위 대각선)으로 줄지어, 앞장선 오리가 왼쪽 위 */
+    ['겨울_1_0',481,725,.45],['겨울_1_1',493,736,.45],['겨울_1_2',505,747,.45],['겨울_3',330,588,.35],
+    ['겨울_5',531,261,2.2,'xmas']]   /* 크리스마스트리 — 성실관 현관 계단 왼쪽 */
+};
+/* 눌렀을 때 말풍선에 빨간 하트를 띄우는 소품 — 사물이라 말 대신 하트 (사용자 요청) */
+const PROPHEART=new Set(['겨울_0','겨울_5']);
+/* 입체 하트 — 왼쪽 위에서 빛: 밝은 빨강→어두운 빨강 그라데이션 + 가장자리 어둡게 + 반짝이 + 아래 그림자 (2026-10-24 사용자 요청) */
+const HEART='<svg viewBox="0 0 32 28" style="display:block;width:2vw;overflow:visible;filter:drop-shadow(0 .12vw .1vw rgba(120,0,10,.45))"><defs>'+
+  '<radialGradient id="hg" cx=".34" cy=".3" r=".8"><stop offset="0" stop-color="#ff8a8f"/><stop offset=".45" stop-color="#e5383b"/><stop offset="1" stop-color="#9d0b1c"/></radialGradient>'+
+  '<radialGradient id="hs" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>'+
+  '<path d="M16 27C6 19 1 14 1 8.5 1 4.4 4.3 1 8.4 1c3.1 0 5.4 1.7 7.6 4.6C18.2 2.7 20.5 1 23.6 1 27.7 1 31 4.4 31 8.5 31 14 26 19 16 27z" fill="url(#hg)" stroke="#8a0a18" stroke-width=".6" stroke-opacity=".5"/>'+
+  '<ellipse cx="8.6" cy="7.2" rx="4.2" ry="2.6" transform="rotate(-30 8.6 7.2)" fill="url(#hs)"/>'+
+  '<circle cx="23.5" cy="6" r="1.3" fill="#fff" opacity=".55"/></svg>';
+let props=[],critters=[];
+function buildProps(){
+  document.querySelectorAll('#world .prop,#world .critter').forEach(e=>e.remove());props=[];critters=[];
+  for(const [f,x,y,h,kind] of PROPS[SEA]||[]){
+    const H=h*KH*scaleAt(y),src=`작은동명/소품/${f}.png`;
+    if(kind==='bird'||kind==='fly'){
+      const el=document.createElement('div');el.className='critter'+(kind==='fly'?' flap':'');el.innerHTML=`<img src="${encodeURI(src)}" alt="">`;
+      $('world').appendChild(el);
+      const c={el,kind,x,y,hx:x,hy:y,H,w:H,ph:rnd()*6.28,face:1,away:0,hopT:rnd()*3,lift:kind==='fly'?14+rnd()*8:0};
+      el.querySelector('img').onload=e=>{c.w=H*e.target.naturalWidth/e.target.naturalHeight;el.style.width=c.w+'px';el.style.height=H+'px'};
+      critters.push(c);continue;
+    }
+    const im=document.createElement('img');im.className='prop'+(kind==='xmas'?' xmas':'');im.src=src;im.alt='';
+    im.style.cssText=`left:${x}px;top:${y}px;height:${H}px;z-index:${Math.round(y)}`;
+    $('world').appendChild(im);props.push({el:im,f,x,y,H});
+  }
+}
+/* 나비·잠자리는 제자리 둘레를 8자로 맴돌고, 참새는 가끔 깡충·두리번. 누르면 날아갔다가 20초 뒤 돌아옴 */
+const BIRDAWAY=7.2;                            /* 참새 비켜남 전체 시간 = 가기 1.1초 + 놀기 5초 + 돌아오기 1.1초 (예전 12초는 10초 가까이 굳어 있어 어색) */
+function stepCritters(dt){
+  for(const c of critters){
+    c.ph+=dt;let x=c.hx,y=c.hy,up=c.lift;
+    if(c.away>0&&c.kind==='bird'){             /* 참새 — 날지 않고 깡충깡충 세 번 뛰어 비켜났다가, 5초쯤 거기서 놀고 다시 깡충깡충 돌아옴 */
+      c.away-=dt;const e=BIRDAWAY-c.away,H=1.1;let f=0;
+      if(e<H)f=e/H;else if(c.away>H)f=1;else f=c.away/H;
+      const moving=e<H||c.away<=H;x+=(c.tx-c.hx)*f;y+=(c.ty-c.hy)*f;
+      if(moving){up+=Math.abs(Math.sin((e<H?e:c.away)/H*3*Math.PI))*4;c.face=(e<H?1:-1)*Math.sign(c.tx-c.hx||1)}
+      else{c.hopT-=dt;if(c.hopT<0){c.hopT=.8+rnd()*1.6;if(rnd()<.5)c.face=-c.face}up+=c.hopT<.25?Math.sin(c.hopT/.25*Math.PI)*3:0}   /* 비켜난 자리에서도 깡충·두리번 (굳어 있지 않게, 2026-10-25) */
+      if(c.away<=0)c.away=0;
+    }
+    else if(c.away>0){c.away-=dt;const k=Math.min(1,(20-c.away)/1.2);x+=k*60*c.face;up+=k*70;
+      c.el.style.opacity=k>=1?0:1-k*.6;if(c.away<=0){c.el.style.opacity=1}}
+    else if(c.kind==='fly'){const sp=c.H<9?1.6:1.1;x+=Math.sin(c.ph*sp)*18;y+=Math.sin(c.ph*sp*2)*6;up+=Math.sin(c.ph*3)*3;
+      const nf=Math.cos(c.ph*sp)>=0?1:-1;c.face=nf}
+    else{c.hopT-=dt;if(c.hopT<0){c.hopT=1.5+rnd()*4;if(rnd()<.4)c.face=-c.face}up+=c.hopT<.25?Math.sin(c.hopT/.25*Math.PI)*3:0}
+    c.x=x;c.y=y;
+    c.el.style.transform=`translate(${x-c.w/2}px,${y-c.H-up}px)${c.face<0?' scaleX(-1)':''}`;c.el.style.zIndex=Math.round(y);
+  }
+}
+const pbubs=[];                                /* 소품 말풍선 — 그림 좌표에 붙여 둠 */
+function propSay(x,y,text,html,sec=2.6){
+  const b=document.createElement('div');b.className='bub';if(html){b.innerHTML=html;b.style.padding='.7vw .9vw'}else b.textContent=text;
+  $('stage').appendChild(b);pbubs.push({b,x,y,t:sec});
+}
+function tapProp(wx,wy){
+  for(const c of critters)if(c.away<=0&&Math.abs(wx-c.x)<Math.max(c.w,10)&&wy<c.y+4&&wy>c.y-c.H-c.lift-10){
+    critters.filter(o=>o.kind===c.kind&&Math.hypot(o.hx-c.hx,o.hy-c.hy)<80).forEach(o=>{
+      if(o.kind==='bird'){const dir=wx<o.x?1:-1;o.away=BIRDAWAY;o.hopT=.4+rnd()*.8;      /* 누른 쪽 반대로 비켜남 — 풀밭(왼쪽 아래 462~536) 안에서만 */
+        o.tx=Math.max(462,Math.min(536,o.hx+dir*26));o.ty=o.hy-4;if(Math.abs(o.tx-o.hx)<8)o.tx=o.hx-dir*26}
+      else{o.away=20;o.face=wx<o.x?1:-1}});return true}
+  for(const p of props){const w=(p.el.naturalWidth/p.el.naturalHeight||1)*p.H;
+    if(Math.abs(wx-p.x)<w/2+3&&wy<=p.y+3&&wy>=p.y-p.H-3){
+      p.el.classList.remove('wig');void p.el.offsetWidth;p.el.classList.add('wig');
+      if(PROPHEART.has(p.f))propSay(p.x,p.y-p.H-2,'',HEART);
+      if(p.f==='겨울_0')egg('snowman',TAPS,startSnow);                 /* 눈사람 — 여러 번(TAPS) 누르면 눈싸움 */
+      return true}}
+  return false;
+}
+/* 흩날리는 것 — 봄 꽃잎, 가을 낙엽, 겨울 눈 (여름은 없음) */
+function buildFall(){
+  const F=$('fall');F.innerHTML='';
+  const kind={봄:['#f7c6d4','#fbd9e3','#f3b3c6'],가을:['#e8833a','#f2b33d','#d9612f','#f5c542'],겨울:['#ffffff','#f4f7ff']}[SEA];if(!kind)return;
+  const n=SEA==='겨울'?36:22;
+  for(let i=0;i<n;i++){const e=document.createElement('i'),s=SEA==='겨울'?.35+rnd()*.45:.55+rnd()*.5;
+    e.style.cssText=`left:${rnd()*100}%;width:${s}vw;height:${SEA==='겨울'?s:s*.7}vw;background:${pick(kind)};`+
+      `border-radius:${SEA==='겨울'?'50%':SEA==='봄'?'60% 0 60% 0':'50% 0'};opacity:${SEA==='겨울'?.85:.9};`+
+      `--dx:${(rnd()*16-4).toFixed(1)}vw;--rot:${Math.round(rnd()*720-360)}deg;`+
+      `animation-duration:${(SEA==='겨울'?9:12)+rnd()*8}s;animation-delay:${-rnd()*20}s`;
+    F.appendChild(e)}
+}
+
+function buildKids(){
+  const names=Object.keys(NODES);
+  /* 길을 걷는 학생 9명 — 그중 둘씩 짝지은 친구 2쌍(뒤 학생이 앞 학생을 따라 걸음) */
+  /* 그중 1명(5번째, 친구가 따라오지 않는 학생)은 바지 교복 — 단발 + 치마와 같은 천 긴바지, 가을·겨울엔 동복 바지 (2026-10-26) */
+  for(let i=0;i<9;i++){const n=pick(names),k=makeKid('path',NODES[n],i===4?'바지':undefined);k.node=n}
+  for(const lead of [kids[0],kids[3]]){const f=makeKid('follow',[lead.x+6,lead.y+3]);f.lead=lead;f.ox=7;f.oy=3}
+  /* 친구 찾기 — 가방 멘 친구 한 명도 길을 걸음 */
+  {const n=pick(names),k=makeKid('path',NODES[n],'가방');k.node=n;dress(k)}
+  /* 운동장 — 자유롭게 다니는 학생 3명, 트랙을 달리는 학생 2명 */
+  for(let i=0;i<3;i++)makeKid('field',fieldSpot());
+  for(let i=0;i<2;i++){const k=makeKid('jog',[0,0]);k.ang=i*Math.PI;k.speed=34}
+  /* 수다 떠는 친구 셋 (가끔 'ㅋㅋ' 같은 짧은 말풍선) */
+  for(const [x,y,f] of [[382,548,1],[408,540,-1],[400,560,-1]]){const k=makeKid('chat',[x,y]);k.face=f;k.chatT=0}
+  makeKid('wave',[930,430]);
+  /* 동상 계단 양옆 벤치 — 운동장(오른쪽 아래)을 바라보고 앉은 학생 */
+  for(const [x,y] of BENCHES){
+    const im=document.createElement('img');im.src='작은동명/의자_칸.png';
+    im.style.cssText=`position:absolute;left:${x-BW/2}px;top:${y-BW*BR}px;width:${BW}px;height:${BW*BR}px;z-index:${Math.round(y)};pointer-events:none`;
+    $('world').appendChild(im);
+    const k=makeKid('sit',[x+SITDX,y+SITDY]);k.face=1;k.sx=k.x;k.sy=k.y;setFrame(k,6,true);
+    k.seat=BENCHES.findIndex(b=>b[0]===x);k.sitT=4+rnd()*10;
+  }
+  TM=makeTeacher('교사남',fieldSpot());TF=makeTeacher('교사여',TN.g2);TF.node='g2';
+  kids.forEach(place);
+  makeCat();
+}
+function stepKids(dt){
+  for(const k of kids){
+    if(k.react>0){k.react-=dt;if(k.react<=0)k.el.classList.remove('hop');}
+    if(k.tch){stepTeacher(k,dt);place(k);continue}
+    if(k.mode==='go'){if(walkWay(k,dt,3.5*(k.gm||1))){k.face=-1;setFrame(k,0,false);k.spr.style.marginBottom='0px'}place(k);continue}
+    if(k.mode==='back'){if(walkWay(k,dt,2.2))restoreKid(k);place(k);continue}
+    if(k.mode==='senior'){stepSenior(k,dt);continue}
+    if(k.mode==='in')continue;                  /* 수업 종 — 건물 안에 들어가 안 보임 */
+    if(['race','cheer','photo','rain','snow'].includes(k.mode)){place(k);continue}   /* 체육대회·기념사진·소나기·눈싸움 — 움직임은 각 놀이(step…)가 맡음 */
+    if(k.mode==='chase'){stepChase(k,dt);continue}       /* 체육대회 — 움직임은 stepSports 가 맡음 */
+    /* 벤치 학생 — 누르면 벤치 앞에 일어서서 손 들고, 반응이 끝나면 다시 앉음 */
+    if(k.mode==='sit'){if(k.react>0){setFrame(k,reactFrame(k),false);k.y=k.sy+4}else{setFrame(k,6,true);k.y=k.sy;
+      if(k.sitT!==undefined&&(k.sitT-=dt)<=0)standUp(k)}place(k);continue}
+    if(k.mode==='stroll'){stepStroll(k,dt);place(k);continue}
+    if(k.mode==='wave'){place(k);continue}
+    if(k.react>0){setFrame(k,reactFrame(k),k.face>0);k.spr.style.marginBottom='0px';place(k);continue}
+    if(k.mode==='chat'){                        /* 수다 — 서로 마주 보고, 말할 때 손짓 (무슨 말을 할지는 stepTalk) */
+      k.chatT-=dt;setFrame(k,k.chatT>0?5:0,k.face>0);
+      place(k);continue}
+    if(k.mode==='jog'){                         /* 트랙 달리기 — 동쪽 반 바퀴 고리를 계속 돎 */
+      const p0=jogAt(k.ang);k.ang+=dt*k.speed/120;const p1=jogAt(k.ang);
+      k.x=p1[0];k.y=p1[1];const dx=p1[0]-p0[0],dy=p1[1]-p0[1];if(Math.abs(dx)>.01)k.face=dx<0?-1:1;
+      k.ph+=dt;walkFrame(k,dy,.08);place(k);continue}
+    if(k.mode==='follow'){                      /* 친구 따라 걷기 — 앞 학생 옆 조금 뒤 */
+      k.tx=k.lead.x+k.ox;k.ty=k.lead.y+k.oy;}
+    const dx=k.tx-k.x,dy=k.ty-k.y,d=Math.hypot(dx,dy);
+    if(d<1||(k.mode==='follow'&&d<2.5)){
+      setFrame(k,k.hopT>0?5:0,k.face>0);k.wait-=dt;
+      if(k.mode==='follow'){place(k);continue}
+      /* 기다리는 동안 — 두리번거리거나, 가끔 깡충 */
+      if(rnd()<dt*.6)k.face=-k.face;
+      if(k.hopT>0)k.hopT-=dt;else if(rnd()<dt*.08){k.hopT=.8;k.el.classList.remove('hop');void k.el.offsetWidth;k.el.classList.add('hop')}
+      if(k.wait<=0){
+        k.run=k.mode==='path'&&rnd()<.18;         /* 가끔 뛰어감 */
+        if(k.mode==='field'){[k.tx,k.ty]=fieldSpot(k.x,k.y)}
+        else{const nb=NB[k.node].filter(n=>n!==k.prev);const nx=pick(nb.length?nb:NB[k.node]);k.prev=k.node;k.node=nx;[k.tx,k.ty]=NODES[nx]}
+        k.wait=k.mode==='field'?1+rnd()*3:(rnd()<.25?1+rnd()*2:0);
+      }
+    }else{
+      const sp=k.mode==='follow'?Math.max(k.lead.speed*(k.lead.run?2.2:1),d*2):k.speed*(k.run?2.2:1);
+      const v=Math.min(d,sp*scaleAt(k.y)*dt);k.x+=dx/d*v;k.y+=dy/d*v;if(Math.abs(dx)>.5)k.face=dx<0?-1:1;
+      k.ph+=dt;walkFrame(k,dy,k.run?.09:.16);place(k);continue;
+    }
+    place(k);
+  }
+  for(let i=kids.length-1;i>=0;i--)if(kids[i].dead)kids.splice(i,1);
+  if(sports)stepSports(dt);
+  if(bell)stepBell(dt);
+  if(photo)stepPhoto(dt);
+  if(rain)stepRain(dt);if(snow)stepSnow(dt);
+  stepSpotCat(dt);
+  stepTalk(dt);stepMono(dt);
+}
+/* ── 벤치 학생 — 10~22초 앉았다가 일어나 동상 둘레 잔디를 두세 군데 거닐고, 비어 있는 벤치에 다시 앉음 (2026-10-29 사용자 요청).
+   잔디 길 점은 트랙·나무·꽃밭을 피해 그림에 찍어 확인. L 은 동상 왼쪽 아래, R 은 오른쪽, B1·B2 는 벤치 자리 ── */
+const SN={L1:[585,332],L2:[606,350],L3:[590,375],L4:[640,372],L5:[668,374],R1:[700,348],R2:[748,334],R3:[745,312],R4:[770,322]};
+const SNB={};'L1-L2 L1-L3 L2-L3 L2-L4 L3-L4 L4-L5 L5-R1 R1-R2 R2-R3 R3-R4 R2-R4'.split(' ').forEach(e=>{const [a,b]=e.split('-');(SNB[a]=SNB[a]||[]).push(b);(SNB[b]=SNB[b]||[]).push(a)});
+const SEATNB=[['L3','L4'],['R1','R2']];         /* 벤치마다 바로 옆 잔디 점 — 여기서 앉으러 감 */
+const seatAt=i=>[BENCHES[i][0]+SITDX,BENCHES[i][1]+SITDY];
+const seatFree=(i,k)=>!kids.some(o=>o!==k&&o.seat===i);
+function snPath(a,b){const prev={[a]:null},q=[a];
+  while(q.length){const n=q.shift();if(n===b)break;for(const m of SNB[n])if(!(m in prev)){prev[m]=n;q.push(m)}}
+  const p=[];for(let n=b;n;n=prev[n])p.unshift(n);return p}
+const nearSN=k=>Object.keys(SN).reduce((a,b)=>Math.hypot(SN[a][0]-k.x,SN[a][1]-k.y)<Math.hypot(SN[b][0]-k.x,SN[b][1]-k.y)?a:b);
+function standUp(k){                           /* 벤치 앞에서 일어나 옆 잔디 점으로 */
+  const i=k.seat;k.seat=null;k.mode='stroll';k.y=k.sy+4;k.legs=2+Math.floor(rnd()*2);k.wait=0;
+  k.snode=pick(SEATNB[i]);k.way=[SN[k.snode]];
+}
+function sitDown(k,i){k.mode='sit';k.seat=i;[k.sx,k.sy]=seatAt(i);k.x=k.sx;k.y=k.sy;k.face=1;k.spr.style.marginBottom='0px';setFrame(k,6,true);k.sitT=10+rnd()*12}
+function stepStroll(k,dt){
+  if(k.react>0){setFrame(k,reactFrame(k),k.face>0);k.spr.style.marginBottom='0px';return}
+  if(k.way&&k.way.length){if(walkWay(k,dt,.8))k.spr.style.marginBottom='0px';return}
+  if(k.seat!=null){                            /* 앉으러 가던 중 — 닿았으면 앉고, 놀이 뒤 다른 데서 돌아왔으면 다시 벤치로 */
+    const p=seatAt(k.seat);if(Math.hypot(p[0]-k.x,p[1]-k.y)<1.5)return sitDown(k,k.seat);k.way=[p];return}
+  if(!k.snode||Math.hypot(SN[k.snode][0]-k.x,SN[k.snode][1]-k.y)>3){k.snode=nearSN(k);k.way=[SN[k.snode]];return}
+  setFrame(k,0,k.face>0);k.wait-=dt;if(rnd()<dt*.5)k.face=-k.face;if(k.wait>0)return;   /* 점마다 잠깐 두리번 */
+  if(--k.legs<=0){                             /* 비어 있는 벤치로 — 잔디 길 점을 따라 그 벤치 옆 점까지 간 뒤 앉음 */
+    const free=[0,1].filter(i=>seatFree(i,k));
+    if(free.length){const i=free.reduce((a,b)=>Math.hypot(seatAt(a)[0]-k.x,seatAt(a)[1]-k.y)<=Math.hypot(seatAt(b)[0]-k.x,seatAt(b)[1]-k.y)?a:b);
+      const p=snPath(k.snode,SEATNB[i].reduce((a,b)=>snPath(k.snode,a).length<=snPath(k.snode,b).length?a:b));
+      k.seat=i;k.snode=p.at(-1);k.way=[...p.slice(1).map(n=>SN[n]),seatAt(i)];return}
+    k.legs=1}                                  /* 두 벤치 다 차 있으면 한 군데 더 */
+  const nb=SNB[k.snode].filter(n=>n!==k.sprev),nx=pick(nb.length?nb:SNB[k.snode]);k.sprev=k.snode;k.snode=nx;k.way=[SN[nx]];k.wait=rnd()<.5?.5+rnd()*1.5:0;
+}
+
+/* ── 선생님 두 분 — 학생보다 조금 크게. kids 에 같이 넣어 그리기·말풍선·누르기는 학생과 같이 하고,
+   놀이에 학생을 고를 때는 pupils() 로 선생님을 뺌 (2026-10-29 사용자 요청)
+   남자 선생님(TM): 운동장을 거닐다가 체육대회 때 출발선 옆에서 '준비!'·'출발!', 소나기 때 '처마 밑으로 피해!' 하고 차양 끝으로
+   여자 선생님(TF): 동상 둘레 잔디를 거닐다가 수업 종 때 '교실 들어가!' 하고 성실관 현관 앞에 서서 학생들을 들여보냄,
+                    100주년 기념사진 때 사진 찍는 사람 ── */
+const TH=38;                                   /* 선생님 키 (학생 34) */
+let TM=null,TF=null;
+const pupils=()=>kids.filter(k=>!k.tch);
+/* 여자 선생님 길 — t 는 성실관 앞 보도(t3 = 현관 계단 앞), g 는 동상 왼쪽 아래 잔디 (그림에 점 찍어 확인) */
+const TN={t1:[440,300],t2:[515,276],t3:[592,248],t4:[640,236],t5:[700,215],g1:[604,296],g4:[585,332],g2:[606,350],g3:[668,374]};
+const TNB={};'t1-t2 t2-t3 t3-t4 t4-t5 t3-g1 g1-g4 g4-g2 g2-g3'.split(' ').forEach(e=>{const [a,b]=e.split('-');(TNB[a]=TNB[a]||[]).push(b);(TNB[b]=TNB[b]||[]).push(a)});
+function tPath(a,b){const prev={[a]:null},q=[a];
+  while(q.length){const n=q.shift();if(n===b)break;for(const m of TNB[n])if(!(m in prev)){prev[m]=n;q.push(m)}}
+  const p=[];for(let n=b;n;n=prev[n])p.unshift(n);return p}
+/* 평소 거니는 곳 — 동상 둘레 잔디만 (기념사진 자리와 가깝게, 2026-10-29 사용자 요청). 보도(t)는 수업 종 때 현관 가는 길로만 씀 */
+const TROAM=new Set(['g1','g4','g2','g3']);
+const nearTN=k=>Object.keys(TN).reduce((a,b)=>Math.hypot(TN[a][0]-k.x,TN[a][1]-k.y)<Math.hypot(TN[b][0]-k.x,TN[b][1]-k.y)?a:b);
+/* 체육대회 때 남자 선생님 자리 — 출발선 바깥쪽, 소나기 때 자리 — 차양 동쪽 끝 기둥 앞 (학생 자리는 x 1098 까지) */
+/* 소나기 자리 — 처음 (1112, 기둥선+12)은 계단 끝에 걸려 보여 10시 방향으로 옮김 (2026-10-29 사용자 요청). 학생 줄은 x 1086 까지 */
+const TSTART=()=>trackAt(244,110,RSTART+.32),TSHELTER=()=>[1103,CANOPY_YF(1103)+9];
+const BELLSAY=['수업 늦겠다, 얼른 들어가!','다들 서둘러!','지각하면 안 된다!'];   /* 수업 종 — 현관 앞에서 독려 */
+const TSAY=['안녕! 구경 잘하고 있니?','오늘도 좋은 하루 보내렴!','교복은 단정하게 입자!','힘든 일 있으면 언제든 선생님한테 얘기해!'];   /* 2026-10-29 사용자 요청으로 '100주년 축하'·'복도에서 뛰지 말자' 대신 */
+function makeTeacher(st,pos){
+  const k=makeKid('roam',pos,st);k.tch=true;k.h=TH;k.speed=13;k.wait=1+rnd()*2;
+  k.el.style.height=TH+'px';k.el.style.marginTop=(-TH)+'px';dress(k);return k;
+}
+function teacherNext(k){                       /* 다음 갈 곳 — 남자는 운동장 아무 데나, 여자는 길 점을 따라 */
+  if(k===TM){k.way=routeTo(k.x,k.y,...fieldSpot(k.x,k.y));k.wait=1+rnd()*3;return}
+  if(!k.node||Math.hypot(TN[k.node][0]-k.x,TN[k.node][1]-k.y)>3){k.node=nearTN(k);k.prev=null}
+  else if(!TROAM.has(k.node)){k.prev=k.node;k.node=tPath(k.node,'g1')[1]}   /* 현관에서 돌아올 때 — 보도를 따라 동상 쪽으로 */
+  else{const all=TNB[k.node].filter(n=>TROAM.has(n)),nb=all.filter(n=>n!==k.prev),nx=pick(nb.length?nb:all);k.prev=k.node;k.node=nx}
+  k.way=[TN[k.node]];k.wait=rnd()<.4?1+rnd()*3:0;
+}
+/* k.then — 놀이 자리에 닿았을 때 할 일. 'go'(기념사진 모이기)는 닿으면 그대로 서서 기다림, 'tgo'·'back' 은 닿으면 다시 거닒 */
+function stepTeacher(k,dt){
+  if(k.mode==='in')return;                     /* 수업 종 — 성실관 안 */
+  if(k.mode==='roam'&&k.react>0){setFrame(k,reactFrame(k),k.face>0);k.spr.style.marginBottom='0px';return}
+  if(k.way&&k.way.length){
+    /* 숨은 재미 때는 거닐 때보다 빠르게 — 처음 2.2배에서 1.8배 더 (여자 선생님: 사진 찍으러 가는 시간, 남자 선생님: 체육대회 출발이 늦었음, 2026-10-29 사용자 요청) */
+    if(walkWay(k,dt,k.mode==='roam'?1:2.2*1.8)){k.spr.style.marginBottom='0px';setFrame(k,0,k.face>0);
+      const f=k.then;k.then=null;if(f)f(k);else if(k.mode!=='go')k.mode='roam'}
+    return}
+  if(k.mode!=='roam')return;                   /* 출발 신호·비 피하기·사진 찍기 — 그림은 각 놀이가 맡음 */
+  setFrame(k,0,k.face>0);k.wait-=dt;if(rnd()<dt*.3)k.face=-k.face;
+  if(k.wait<=0)teacherNext(k);
+}
+/* 놀이를 맡을 수 있는 선생님 — 거닐고 있을 때만 */
+const freeT=k=>k&&k.mode==='roam'&&!k.then?k:null;
+/* 놀이가 끝나면 다시 거닐기 — 아직 자리로 가는 중이었으면 닿은 뒤 바로 거닒 */
+function teacherBack(k){if(!k)return;k.then=null;if(k.mode==='stand'){k.mode='roam';k.wait=.5}else if(k.mode==='tgo')k.mode='back'}
+
+/* 정해진 점들(k.way)을 차례로 걸어가기 — 놀이(체육대회·수업 종 등)에 모이기·옛 선배·제자리로 돌아가기에 같이 씀. 다 가면 true */
+function walkWay(k,dt,mul){
+  if(!k.way||!k.way.length)return true;
+  const [tx,ty]=k.way[0],dx=tx-k.x,dy=ty-k.y,d=Math.hypot(dx,dy);
+  if(d<1){k.way.shift();return !k.way.length}
+  const v=Math.min(d,k.speed*mul*scaleAt(k.y)*dt);k.x+=dx/d*v;k.y+=dy/d*v;if(Math.abs(dx)>.5)k.face=dx<0?-1:1;
+  /* 옛 선배는 거의 옆으로 걸을 때(기울기 1/2 미만) 위쪽으로 가더라도 앞모습 */
+  k.ph+=dt;walkFrame(k,k.mode==='senior'&&Math.abs(dy)<Math.abs(dx)*.5?0:dy,mul>3?.07:mul>1.5?.09:.16);return false;
+}
+/* 곧장 가면 조회대 지붕을 가로지를 때는 조회대 둘레의 점들을 거쳐 가장 짧게 돌아가는 길 */
+const RING=[[660,428],[800,418],[884,505],[884,645],[792,652],[656,548]];
+function routeTo(x0,y0,x1,y1){
+  if(!crossesStage(x0,y0,x1,y1))return [[x1,y1]];
+  const P=[[x0,y0],...RING,[x1,y1]],n=P.length,D=P.map(()=>1e9),prev=P.map(()=>-1),done=P.map(()=>false);D[0]=0;
+  for(;;){let u=-1;for(let i=0;i<n;i++)if(!done[i]&&(u<0||D[i]<D[u]))u=i;if(u<0||D[u]>=1e9)break;done[u]=true;if(u===n-1)break;
+    for(let v=0;v<n;v++)if(!done[v]&&!crossesStage(P[u][0],P[u][1],P[v][0],P[v][1])){const d=D[u]+Math.hypot(P[u][0]-P[v][0],P[u][1]-P[v][1]);if(d<D[v]){D[v]=d;prev[v]=u}}}
+  if(prev[n-1]<0)return [[x1,y1]];
+  const w=[];for(let i=n-1;i>0;i=prev[i])w.unshift(P[i]);return w;
+}
+/* 여러 번 누르기 알아채기 — 시간 제한 없이 같은 것을 연달아 n번 누르면 fn.
+   중간에 다른 곳(다른 학생·소품·건물·빈 곳)을 누르면 처음부터 다시 셈 (tap() 끝에서 eggUsed 로 판단) */
+let eggKey=null,eggN=0,eggUsed=false;
+const TAPS=3;                                  /* 숨은 재미를 여는 누르기 횟수 — 모두 같게 (2026-10-25 사용자 요청으로 4 → 3) */
+function egg(key,n,fn){
+  eggUsed=true;if(eggKey!==key){eggKey=key;eggN=0}
+  if(++eggN>=n){eggKey=null;eggN=0;fn()}
+}
+
+/* ── 숨은 재미 ② 체육대회 달리기 — 운동장 빈 곳을 연달아 세 번(TAPS) 누르면(2026-10-25 전엔 조회대) 청팀·백팀 선수 6명이 출발선에 서고 '탕!' 신호에
+   운동장 트랙(조회대를 피한 동쪽 타원, JOG)을 한 바퀴 달림. 나머지 학생은 트랙 바깥에서 응원.
+   1등이 들어오면 그 팀이 환호하고 잠시 뒤 모두 하던 일로 돌아감 ── */
+let sports=null;
+/* 소리 장치 — 처음 화면을 만질 때 한 번 켜서 계속 깨워 둠. 소리마다 새로 켜고 끄면 Windows 가 장치를 깨우느라
+   소리가 늦게 났음 (2026-10-24 사용자: '탕'·종소리가 늦다) */
+let AC=null,POP=null;
+function ac(){
+  if(!AC)try{AC=new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'});
+    const n=AC.sampleRate*.25|0;POP=AC.createBuffer(1,n,AC.sampleRate);const d=POP.getChannelData(0);   /* '탕' 은 미리 만들어 둠 */
+    for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/n,5)}catch(e){}
+  if(AC&&AC.state==='suspended')AC.resume();return AC;
+}
+window.addEventListener('pointerdown',ac,true);
+/* 출발 신호 '탕' — 짧은 잡음, 전시장이라 작게. sec 초 뒤로 미리 예약하고 그 소리 시계 시각을 돌려줌(못 하면 null).
+   선수들이 출발선까지 걷는 동안 소리가 없어 장치가 쉬었다가 늦게 울려서, '준비!' 때 미리 예약함 (2026-10-24) */
+/* 소리가 실제로 들리기까지 걸리는 시간 — 컴퓨터 쪽 지연(브라우저가 알려 줌) + TV 스피커 지연(SOUND_TV, 브라우저는 모름).
+   '탕!' 글자와 선수 출발을 이만큼 늦춰 소리와 같이 보이게 함. 키오스크에서 글자가 소리보다 먼저면 SOUND_TV 를 키우고, 늦으면 줄일 것 (2026-10-24) */
+const SOUND_TV=.15;
+const soundLag=()=>(AC?(AC.outputLatency||AC.baseLatency||0):0)+SOUND_TV;
+function pop(sec=0){
+  try{const C=ac();if(!C||C.state!=='running')return null;const at=C.currentTime+sec,s=C.createBufferSource(),g=C.createGain();
+    g.gain.value=.22;s.buffer=POP;s.connect(g).connect(C.destination);s.start(at);return at}catch(e){return null}
+}
+function inField(x,y){const dx=x-FIELD.cx,dy=y-FIELD.cy,c=Math.cos(FIELD.ang),s=Math.sin(FIELD.ang),u=dx*c+dy*s,v=-dx*s+dy*c;
+  return (u/FIELD.a)**2+(v/FIELD.b)**2<=1}
+/* 그림 속 실제 트랙 — 흰 점선 바깥 띠. 레인 0~2 (track.py 로 그림에 대 보며 맞춤).
+   왼쪽 아래 굽은 곳은 조회대 뒤로 지나가며 조회대 가림 조각(가림/계절/조회대.png)에 가려짐 */
+const TRACK={cx:857,cy:482,ang:17.5*Math.PI/180};
+const LANE=l=>[{a:198,b:82},{a:208,b:87},{a:218,b:92}][l];
+function trackAt(a,b,t){const u=Math.cos(t)*a,v=Math.sin(t)*b,c=Math.cos(TRACK.ang),s=Math.sin(TRACK.ang);
+  return [TRACK.cx+u*c-v*s,TRACK.cy+u*s+v*c]}
+function laneAt(l,t){const {a,b}=LANE(l);return trackAt(a,b,t)}
+/* 출발·결승선 — 트랙 맨 위(동상 옆 잔디 아래, 약 762,384). 각도가 줄어드는 쪽으로 달려 마지막에 위쪽 직선을 오른쪽→왼쪽으로 들어옴.
+   (2026-10-25 사용자 요청: 예전 오른쪽 아래(.95)에서 출발하면 골인 직전 왼쪽 아래 굽은 곳이 조회대에 가려 막판이 안 보였음) */
+const RSTART=4.06;
+const CHEER=[['청팀 이겨라!','청팀 파이팅!','힘내!'],['백팀 이겨라!','백팀 파이팅!','힘내!']];
+function teamBand(k,team){                    /* 머리띠 — 청팀 파랑, 백팀 흰색. team<0 이면 뗌 */
+  let b=k.el.querySelector('.band');
+  if(team<0){if(b)b.remove();return}
+  if(!b){b=document.createElement('i');k.el.appendChild(b)}b.className='band b'+team;
+}
+function startSports(){
+  if(busy())return;found('sports');
+  const L=pupils().filter(k=>k.mode!=='senior'&&!k.off);
+  L.forEach(k=>{k.save={mode:k.mode,x:k.x,y:k.y,face:k.face};if(k.bub){k.bub.remove();k.bub=null}});
+  /* 선수 6명 — 출발선에서 가까운 학생부터. 3레인 × 2줄 */
+  const st=laneAt(1,RSTART);L.sort((a,b)=>Math.hypot(a.x-st[0],a.y-st[1])-Math.hypot(b.x-st[0],b.y-st[1]));
+  const R=L.slice(0,6),S=L.slice(6);
+  R.forEach((k,i)=>{k.team=i%2;k.lane=i%3;k.t0=RSTART+Math.floor(i/3)*.1;k.th=k.t0;k.done=false;
+    k.pace=.93+rnd()*.14;k.pph=rnd()*6;const p=laneAt(k.lane,k.t0);k.mode='go';k.way=routeTo(k.x,k.y,p[0],p[1])});
+  /* 응원 자리 — 트랙 바깥 잔디(위쪽 띠·오른쪽). 왼쪽은 조회대·덤불, 오른쪽 아래(앞쪽)는 선수를 가려서 뺌. 서로 18px 이상 떨어지게 */
+  const spots=[];
+  for(const [a,b] of [[246,110],[236,104]])for(let i=-19;i<=3;i++){const [x,y]=trackAt(a,b,i/72*6.2832);
+    if(!inStage(x,y)&&spots.every(p=>Math.hypot(p[0]-x,p[1]-y)>18))spots.push([x,y])}
+  spots.sort((p,q)=>Math.atan2(p[1]-TRACK.cy,p[0]-TRACK.cx)-Math.atan2(q[1]-TRACK.cy,q[0]-TRACK.cx));
+  S.forEach((k,i)=>{const p=spots[Math.floor(i*spots.length/S.length)]||fieldSpot();k.team=i%2;k.cheerT=rnd();
+    k.mode='go';k.way=routeTo(k.x,k.y,p[0],p[1])});
+  L.forEach(k=>teamBand(k,k.team));
+  /* 먼 학생일수록 빨리 — 가는 데 걸릴 시간(길이 ÷ 제 속도)이 가장 긴 학생은 1.8배, 그 1/1.8 시간 안에 닿는 학생은 그대로,
+     그 사이는 비례해서. 모두 비슷하게 도착해 출발이 빨라짐 (2026-10-29 사용자 요청, 최대 1.8배) */
+  const need=k=>{let d=0,x=k.x,y=k.y;for(const [a,b] of k.way){d+=Math.hypot(a-x,b-y);x=a;y=b}return d/(k.speed*scaleAt(k.y))};
+  const Tref=Math.max(...L.map(need))/1.8;
+  L.forEach(k=>k.gm=Math.max(1,Math.min(1.8,need(k)/Math.max(.01,Tref))));
+  /* 남자 선생님 — 출발선 바깥쪽으로 가서 선수들 쪽을 보고 섬 */
+  const T=freeT(TM);
+  if(T){T.mode='tgo';T.way=routeTo(T.x,T.y,...TSTART());T.then=k=>{k.mode='stand';k.face=laneAt(1,RSTART)[0]<k.x?-1:1;setFrame(k,0,k.face>0)}}
+  sports={t:0,phase:'gather',L,R,S,T,winner:null,cheerT:1};
+  say(R[0],'체육대회 시작!',2.5);
+}
+function cheerOn(k){k.mode='cheer';const c=k.x>TRACK.cx?-1:1;k.face=c;k.spr.style.marginBottom='0px';setFrame(k,0,c>0)}
+function stepSports(dt){
+  const P=sports;P.t+=dt;
+  if(P.phase==='gather'){
+    /* 모두 모이면 출발 — 선수만 모이면 출발하게 했더니 늦게 오는 응원 학생이 달리는 선수 사이를 지나 어수선했음.
+       대신 먼 학생일수록 빨리 옴(startSports 의 k.gm) (2026-10-29) */
+    if((P.L.every(k=>k.mode!=='go'||!k.way.length)&&(!P.T||P.T.mode==='stand'))||P.t>20){
+      P.L.forEach(k=>k.gm=null);
+      P.phase='ready';P.t=0;
+      for(const k of P.R){k.mode='race';k.face=laneAt(k.lane,k.th-.05)[0]<k.x?-1:1;setFrame(k,0,k.face>0);place(k)}  /* 출발선에서 달릴 방향을 봄 */
+      for(const k of P.S)cheerOn(k);
+      if(P.T&&P.T.mode!=='stand')P.T=null;      /* 20초 안에 못 왔으면 선생님 없이 (학생이 '준비!') */
+      say(P.T||P.R[1],'준비!',1.5);P.goAt=pop(1.6);     /* '탕'은 지금 1.6초 뒤로 예약 */
+    }
+    return;
+  }
+  if(P.phase==='ready'){                       /* 예약한 '탕'이 실제로 들리는 때(소리 시계 + 지연)에 '탕!' 글자와 출발 */
+    if(P.goAt==null&&P.t>1.6){P.goAt=pop();if(P.goAt==null)P.goAt=-1}   /* 예약을 못 했으면 지금 울림(-1 = 소리 장치가 꺼져 있어 바로 출발) */
+    const go=P.goAt===-1||P.t>3.5||(P.goAt!=null&&AC.currentTime>=P.goAt+soundLag());
+    if(go){P.phase='race';P.t=0;const s=laneAt(2,RSTART);
+      if(P.T){say(P.T,'출발!',1.5);setFrame(P.T,5,P.T.face>0)}else propSay(s[0]+14,s[1]-30,'탕!')}   /* 선생님이 손 들고 '출발!' */
+    return}
+  /* 응원 — 손 흔들기·서기를 번갈아, 가끔 짧은 응원 말 */
+  /* 응원 중(mode 'cheer')인 학생만 — 끝나고 먼저 돌아와 벤치에 앉은 학생까지 '손 흔들기↔서기'로 바꿔 놓아, 앉은 채 섰다 앉았다 했음 (2026-10-25) */
+  for(const k of P.S)if(k.mode==='cheer'){k.cheerT-=dt;if(k.cheerT<0){k.cheerT=.35+rnd()*.7;setFrame(k,k.fi===5?0:5,k.face>0)}}
+  if(P.phase==='race'||P.phase==='finish'){P.cheerT-=dt;if(P.cheerT<0){P.cheerT=.6+rnd()*.6;const k=pick(P.S);
+    say(k,P.winner?(k.team===P.winner.team?pick(['와아!','대박!',(k.team?'백':'청')+'팀 최고!']):'잘했어!'):pick(CHEER[k.team]),1.3,true)}}
+  if(P.phase==='race'){
+    if(P.T&&P.t>1.2)setFrame(P.T,0,P.T.face>0);   /* 든 손 내리고 선수들을 지켜봄 */
+    for(const k of P.R){if(k.done)continue;
+      const {a,b}=LANE(k.lane),v=85*k.pace*(1+.08*Math.sin(P.t*.9+k.pph)),[x0,y0]=[k.x,k.y];   /* 한 바퀴 약 12초 */
+      k.th-=v*dt/Math.max(1,Math.hypot(a*Math.sin(k.th),b*Math.cos(k.th)));
+      if(k.t0-k.th>=6.2832){k.th=k.t0-6.2832;k.done=true}
+      [k.x,k.y]=laneAt(k.lane,k.th);if(Math.abs(k.x-x0)>.01)k.face=k.x<x0?-1:1;
+      if(k.done){setFrame(k,P.winner?0:5,k.face>0);k.spr.style.marginBottom='0px';
+        if(!P.winner){P.winner=k;say(k,'1등!',3);P.wt=0;
+          /* 1초 뒤 운동장 가운데에 이긴 팀 발표 — 팀 이름은 팀 색으로 */
+          const w=k.team;setTimeout(()=>{if(sports)propSay(TRACK.cx+20,TRACK.cy+10,'',
+            `<b style="color:${w?'#6b7280':'#2f6fd6'}">${w?'백팀':'청팀'}</b> 승리!`,4);pbubs.at(-1).b.classList.add('notail')},1000)}}
+      else{k.ph+=dt;walkFrame(k,k.y-y0,.07)}
+      place(k);
+    }
+    if(P.winner){P.wt+=dt;if(P.R.every(k=>k.done)||P.wt>6){P.phase='finish';P.t=0}}
+    return;
+  }
+  if(P.phase==='finish'&&P.t>3.5){
+    P.phase='back';say(pick(P.S),'수고했어!',2);
+    for(const k of P.L){const to=homeOf(k);teamBand(k,-1);k.mode='back';k.way=routeTo(k.x,k.y,to[0],to[1])}
+    teacherBack(TM);
+    return;
+  }
+  if(P.phase==='back'&&P.L.every(k=>k.mode!=='back'))sports=null;
+}
+function restoreKid(k){
+  const m=k.save.mode;k.mode=m;k.tx=k.x;k.ty=k.y;k.wait=rnd()*2;k.spr.style.marginBottom='0px';
+  if(m==='sit'){k.face=1;k.x=k.sx;k.y=k.sy;setFrame(k,6,true)}   /* 벤치 자리에 정확히 다시 앉음 */else if(m==='wave'){k.face=-1;setFrame(k,5,false)}
+  else if(m==='chat'){k.face=k.save.face;setFrame(k,0,k.face>0)}else setFrame(k,0,k.face>0);
+}
+
+/* ── 숨은 재미 ③ 옛 동명 선배 — 기념관(한옥)을 연달아 세 번(TAPS) 누르면 옛날 교복 학생이 한옥 옆에서 나와
+   꽃밭까지 거닐며 인사하고 다시 한옥 쪽으로 사라짐. 옛날 교복 그림(학생옛날_단발)이 오기 전에는 지금 그림을 빛바랜 색으로 */
+const HIDE=[188,428];                          /* 한옥 오른쪽 아래 덤불 — 선배와 고양이가 사라지고 나타나는 곳 */
+const OLDSAY=['후배들 반가워!','동명 100주년 축하해!','교복 멋지지?'];
+const SOUT=[226,421];                          /* 덤불 오른쪽, 보도 위쪽 가장자리 — 선배가 덤불에서 옆으로 걸어 나오는 첫 점 */
+let senior=null;
+function summonSenior(){
+  if(senior)return;found('senior');
+  const st=ART['옛날단발']?'옛날단발':'단발',k=makeKid('senior',HIDE,st);
+  if(st==='단발')k.el.classList.add('old');
+  k.el.style.opacity=0;setTimeout(()=>k.el.style.opacity=1,40);
+  /* 앞모습으로 나오게 — 덤불에서 앞을 보고 잠깐 선 뒤, 보도 위쪽 가장자리(SOUT)를 따라 옆으로 걸어 나옴.
+     예전엔 덤불 → c1(위쪽)로 곧장 올라가 뒷모습부터 보였음 (2026-10-29 사용자 요청). 옆으로 걷는 동안은 앞모습(walkWay) */
+  k.speed=12;k.way=[SOUT,CATN.c6,CATN.c2,CATN.c1,HIDE];k.pause=1.5;k.face=1;setFrame(k,0,true);
+  place(k);senior=k;
+}
+function stepSenior(k,dt){
+  if(k.pause>0){k.pause-=dt;setFrame(k,k.pause>2.6?5:0,k.face>0);k.spr.style.marginBottom='0px';place(k);return}
+  const n=k.way.length;
+  if(walkWay(k,dt,1)){k.el.remove();if(k.bub)k.bub.remove();k.dead=true;senior=null;return}
+  if(k.way.length<n){                          /* 점 하나에 닿았을 때 */
+    if(k.way.length===4)say(k,'옛날 동명 선배야!',3);
+    if(k.way.length===3){k.pause=4;k.face=-1;say(k,pick(OLDSAY),3.5)}
+    if(k.way.length===1)k.el.style.opacity=0;
+  }
+  place(k);
+}
+/* 학생이 원래 하던 일로 돌아갈 자리 — 체육대회·수업 종이 끝났을 때 같이 씀 */
+function homeOf(k){
+  if(k.tch)return k===TF?TN.g3:fieldSpot(k.x,k.y);   /* 여자 선생님은 잔디 길로 돌아가 다시 길 점을 따라 거닒 */
+  const m=k.save.mode;
+  if(m==='follow')return NODES[k.lead.node];   /* 친구도 친구가 갈 곳으로 간 뒤 다시 따라 걷기 */
+  if(m==='path')return NODES[k.node];if(m==='field')return fieldSpot(k.x,k.y);if(m==='jog')return jogAt(k.ang);return [k.save.x,k.save.y];
+}
+
+/* ── 숨은 재미 ④ 수업 종 — 성실관을 연달아 세 번(TAPS) 누르면 '딩동댕동' 종소리(소리만, 그림에 종은 없음)가 나고
+   학생들이 가까운 출입구로 뛰어 들어갔다가 잠시 뒤 '쉬는 시간이다!' 하며 다시 나와 하던 일로 돌아감 (2026-10-24) ──
+   출입구: 성실관 현관 계단, 창조관 동쪽 끝과 향상관이 만나는 어두운 안쪽 모서리 (사용자 지정 2026-10-24 — 처음엔 차양 아래 두 곳이었음)
+   들어갈 때 사라지고 나올 때 나타나는 곳이 같음 (향상관·경영고는 그림에 현관이 안 보여서 뺌) */
+const DOORS=[[568,246],[1200,402]];
+let bell=null;
+function chime(){                              /* 딩동댕동 — 미·도·레·솔, 전시장이라 작게 */
+  try{const C=ac();if(!C)return;const t0=C.currentTime+.01;
+    [659.3,523.3,587.3,392].forEach((f,i)=>{for(const [m,a] of [[1,.16],[2.76,.035]]){
+      const o=C.createOscillator(),g=C.createGain(),t=t0+i*.6;o.type='sine';o.frequency.value=f*m;
+      g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(a,t+.01);g.gain.exponentialRampToValueAtTime(.0005,t+1.4);
+      o.connect(g).connect(C.destination);o.start(t);o.stop(t+1.5)}})}catch(e){}
+}
+function doorWay(k){                           /* 출입구까지 — 길 위 학생은 길을 따라, 나머지는 가까운 출입구로 곧장 */
+  if(k.mode==='path'&&k.node){
+    const D=/^[ab]/.test(k.node)?DOORS[0]:DOORS[1],prev={[k.node]:null},q=[k.node];let best=k.node;
+    while(q.length){const n=q.shift();if(Math.hypot(NODES[n][0]-D[0],NODES[n][1]-D[1])<Math.hypot(NODES[best][0]-D[0],NODES[best][1]-D[1]))best=n;
+      for(const m of NB[n])if(!(m in prev)){prev[m]=n;q.push(m)}}
+    const p=[];for(let n=best;n;n=prev[n])p.unshift(NODES[n]);return [...p,D];
+  }
+  const D=DOORS.reduce((a,b)=>Math.hypot(a[0]-k.x,a[1]-k.y)<Math.hypot(b[0]-k.x,b[1]-k.y)?a:b);
+  return routeTo(k.x,k.y,D[0],D[1]);
+}
+function ringBell(){
+  if(busy())return;found('bell');
+  const L=pupils().filter(k=>k.mode!=='senior'&&!k.off);
+  L.forEach(k=>{k.save={mode:k.mode,x:k.x,y:k.y,face:k.face};if(k.bub){k.bub.remove();k.bub=null}});
+  chime();
+  const vis=L.filter(k=>{const [x,y]=toScreen(k.x,k.y),r=stage.getBoundingClientRect();return x>0&&x<r.width&&y>0&&y<r.height*.85});
+  const a=pick(vis.length?vis:L);
+  L.forEach(k=>{const w=doorWay(k);k.bway=[...w.slice(0,-1).reverse(),homeOf(k)];k.way=w;k.mode='go'});
+  /* 여자 선생님 — '교실 들어가!' 하고 길을 따라 성실관 현관(t3)으로 가서 들어감. 선생님이 없으면 학생이 '빨리 가자!' */
+  const T=freeT(TF);
+  /* 현관 앞에 닿으면 들어가지 않고 운동장 쪽을 보고 서서 학생들을 들여보냄(stepBell). 학생이 다 들어가면 다시 동상 쪽으로 (2026-10-29) */
+  if(T){T.mode='tgo';T.way=tPath(nearTN(T),'t3').map(n=>TN[n]);T.then=k=>{if(bell&&bell.phase==='run'){k.mode='stand';k.face=1;setFrame(k,0,true);k.cheerT=1.5;k.cheerI=0}else k.mode='roam'};
+    setTimeout(()=>{if(bell)say(T,'종 쳤다! 얼른 교실 들어가!',2.5)},700)}
+  say(a,'수업 종이다!',2.5);const b=!T&&pick(vis.filter(k=>k!==a));if(b)setTimeout(()=>{if(bell&&b.mode==='go')say(b,'빨리 가자!',2)},700);
+  bell={t:0,phase:'run',L,T};
+}
+function stepBell(dt){
+  const B=bell;B.t+=dt;
+  if(B.phase==='run'){
+    for(const k of B.L)if(k.mode==='go'&&(!k.way.length||B.t>14)){k.mode='in';k.el.style.opacity=0;if(k.bub){k.bub.remove();k.bub=null}}
+    /* 여자 선생님 — 현관 앞에서 손짓하며 2.6초쯤마다 독려 */
+    const T=B.T;
+    if(T&&T.mode==='stand'){T.cheerT-=dt;setFrame(T,T.cheerT>1.8?5:0,T.face>0);
+      if(T.cheerT<=0){T.cheerT=2.6;if(!T.bub)say(T,BELLSAY[T.cheerI++%BELLSAY.length],2.2)}}
+    if(B.L.every(k=>k.mode==='in')){B.phase='in';B.t=0;teacherBack(T)}
+    return;
+  }
+  if(B.phase==='in'&&B.t>7){                    /* 쉬는 시간 — 한 명씩 차례로 나옴 */
+    B.phase='out';B.t=0;B.L.forEach((k,i)=>setTimeout(()=>{if(!bell)return;k.el.style.opacity=1;k.mode='back';k.way=k.bway;
+      if(i===0)say(k,'쉬는 시간이다!',2.5)},i*250));
+    return;
+  }
+  if(B.phase==='out'&&B.t>1&&B.L.every(k=>k.mode!=='back'&&k.mode!=='in'))bell=null;
+}
+
+/* ── 숨은 재미 ⑤ 100주년 기념사진 — 설립자 동상을 연달아 세 번(TAPS) 누르면 '기념사진 찍자!' 하고 가장 가까운 10명이
+   동상 앞 계단·잔디에 두 줄로 서고, 1명은 그 앞 운동장 가장자리에서 뒷모습으로 서서 사진을 찍음
+   ('하나, 둘, 셋!' → 찰칵 + 화면 번쩍 → 손 흔들기). 카메라는 몸에 가려 안 보이게 — 새 그림 없이 (2026-10-25) ── */
+/* 모두 동상과 같은 5시 방향(서기 그림을 좌우로 뒤집은 쪽)을 보고, 찍는 사람은 그 시선 앞(무리의 오른쪽 아래)에서 11시 방향을 봄 (2026-10-25 사용자 요청) */
+/* 줄은 '/' 방향(왼쪽 아래 → 오른쪽 위)으로 5명씩 — 앞줄은 뒷줄에서 5시 쪽으로 한 칸. 오른쪽 벤치(x 711~741, y ~333)는 피함 */
+const PHOTO={rows:[0,1,2,3,4].flatMap(i=>[[652+i*11,359-i*5.5]]).concat([0,1,2,3,4].map(i=>[660+i*11,369-i*5.5])),cam:[720,400]};
+let photo=null;
+function shutter(){                            /* 찰칵 — 짧은 잡음 두 번, 작게 */
+  try{const C=ac();if(!C||C.state!=='running')return;
+    for(const [t,len] of [[0,.03],[.07,.05]]){const n=C.sampleRate*len|0,b=C.createBuffer(1,n,C.sampleRate),d=b.getChannelData(0);
+      for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/n,3);
+      const s=C.createBufferSource(),g=C.createGain();g.gain.value=.2;s.buffer=b;s.connect(g).connect(C.destination);s.start(C.currentTime+t)}}catch(e){}
+}
+function flash(){const f=document.createElement('div');f.style.cssText='position:absolute;inset:0;background:#fff;opacity:.85;z-index:3;pointer-events:none;transition:opacity .6s';
+  $('stage').appendChild(f);setTimeout(()=>f.style.opacity=0,60);setTimeout(()=>f.remove(),800)}
+function groupPhoto(){
+  if(busy())return;found('photo');
+  const C=[660,350],free=pupils().filter(k=>!k.off&&!['senior','in','go','back'].includes(k.mode));
+  free.sort((a,b)=>Math.hypot(a.x-C[0],a.y-C[1])-Math.hypot(b.x-C[0],b.y-C[1]));
+  /* 찍는 사람 — 여자 선생님 (2026-10-29). 선생님이 없으면 예전처럼 뒷모습 서기 칸(7)이 있는 학생 */
+  const T=freeT(TF),M=free.slice(0,10),cam=T||free.slice(10).find(k=>k.n>=10)||M.pop();
+  const L=[...M,cam];
+  L.forEach(k=>{k.save={mode:k.mode,x:k.x,y:k.y,face:k.face};if(k.bub){k.bub.remove();k.bub=null}});
+  M.forEach((k,i)=>{const p=PHOTO.rows[i];k.spot=p;k.mode='go';k.way=routeTo(k.x,k.y,p[0],p[1])});
+  /* 선생님은 잔디 길(g3)까지 길을 따라 온 뒤 찍는 자리로 */
+  cam.spot=PHOTO.cam;cam.way=T?[...tPath(nearTN(T),'g3').map(n=>TN[n]),PHOTO.cam]:routeTo(cam.x,cam.y,PHOTO.cam[0],PHOTO.cam[1]);cam.mode='go';
+  say(cam,T?'다들 모여! 기념사진 찍자!':'기념사진 찍자!',2.5);
+  photo={t:0,phase:'gather',M,cam,L};
+}
+function stepPhoto(dt){
+  const P=photo;P.t+=dt;
+  if(P.phase==='gather'){
+    if(P.L.every(k=>k.mode!=='go'||!k.way.length)||P.t>15){
+      P.phase='pose';P.t=0;
+      for(const k of P.M){[k.x,k.y]=k.spot;k.mode='photo';k.face=1;k.spr.style.marginBottom='0px';setFrame(k,0,k.face>0);place(k)}
+      const c=P.cam;[c.x,c.y]=c.spot;c.mode='photo';c.spr.style.marginBottom='0px';setFrame(c,c.n>=10?7:3,true);place(c);   /* 뒷모습 그림은 1시 방향 → 뒤집어 11시(친구들 쪽) */
+    }
+    return;
+  }
+  if(P.phase==='pose'){                         /* 하나, 둘, 셋! → 찰칵 */
+    const c=P.cam,cue=[[.4,'하나,'],[1.2,'둘,'],[2,'셋!']];
+    for(const [t,w] of cue)if(P.t>=t&&P.t-dt<t)say(c,w,.9,true);
+    if(P.t>=2.7){P.phase='snap';P.t=0;shutter();flash();for(const k of P.M)setFrame(k,5,k.face>0)}
+    return;
+  }
+  if(P.phase==='snap'&&P.t>2.2){
+    P.phase='back';P.t=0;say(pick(P.M),'잘 나왔다!',2);
+    for(const k of P.L){const to=homeOf(k);k.mode='back';k.way=routeTo(k.x,k.y,to[0],to[1])}
+    return;
+  }
+  if(P.phase==='back'&&P.L.every(k=>k.mode!=='back'))photo=null;
+}
+
+/* ── 계절을 바꾸면 화면에 보이는 학생 두 명이 그 계절에 맞는 한마디 (2026-10-25) ── */
+const SEASAY={봄:['꽃 폈다!','와, 봄이다!'],여름:['와, 덥다!','여름이다!'],가을:['단풍 예쁘다!','가을이다!'],겨울:['눈이다!','와, 눈 온다!']};
+function seasonCheer(s){
+  const r=stage.getBoundingClientRect();
+  const V2=pupils().filter(k=>!k.off&&!k.bub&&!['in','go','back','race','photo','senior','rain','snow'].includes(k.mode)&&(()=>{const [x,y]=toScreen(k.x,k.y);
+    return x>r.width*.08&&x<r.width*.92&&y>r.height*.15&&y<r.height*.8})());
+  const a=pick(V2),b=pick(V2.filter(k=>k!==a&&Math.hypot(k.x-a.x,k.y-a.y)>60));
+  if(a)say(a,SEASAY[s][0],2.2);if(b)setTimeout(()=>{if(!b.bub)say(b,SEASAY[s][1],2.2)},600);
+}
+
+/* ── 고양이가 달아날 때 가까이 있던 학생 한두 명이 '고양이다!' 하며 몇 걸음 따라가다 멈춤 (2026-10-25) ── */
+function chaseCat(){
+  const N=kids.filter(k=>!k.off&&['path','field'].includes(k.mode)&&Math.hypot(k.x-cat.x,k.y-cat.y)<150)
+    .sort((a,b)=>Math.hypot(a.x-cat.x,a.y-cat.y)-Math.hypot(b.x-cat.x,b.y-cat.y)).slice(0,2);
+  N.forEach((k,i)=>{const dx=cat.x-k.x,dy=cat.y-k.y,d=Math.max(1,Math.hypot(dx,dy)),m=Math.min(25,d*.6);
+    k.chaseM=k.mode;k.mode='chase';k.cw=0;k.way=[[k.x+dx/d*m,k.y+dy/d*m]];
+    if(k.bub){k.bub.remove();k.bub=null}setTimeout(()=>say(k,i?'어디 가!':'고양이다!',1.8),i*500)});
+}
+/* 평소에도 — 고양이 근처(130px)를 지나가거나 벤치에 앉은 학생이 가끔 고양이를 알아봄. 너무 잦지 않게 20초에 한 번까지.
+   걷던 학생은 고양이 쪽으로 한두 걸음 가서 바라보고, 앉은 학생은 앉은 채로 말만 (2026-10-25 사용자: 발견이 너무 적다) */
+const SPOTCAT=['어? 고양이다!','고양이 귀엽다!','야옹아, 안녕!','와, 삼색 고양이다!'];
+let spotT=8;
+function stepSpotCat(dt){
+  spotT-=dt;if(spotT>0||!cat||!['walk','sit','sleep'].includes(cat.state)||busy())return;spotT=1;
+  const N=kids.filter(k=>!k.off&&!k.bub&&['path','field','sit'].includes(k.mode)&&Math.hypot(k.x-cat.x,k.y-cat.y)<130);
+  if(!N.length)return;
+  const k=N.reduce((a,b)=>Math.hypot(a.x-cat.x,a.y-cat.y)<Math.hypot(b.x-cat.x,b.y-cat.y)?a:b);spotT=20;
+  say(k,pick(SPOTCAT),2.2);if(k.mode==='sit')return;
+  const dx=cat.x-k.x,dy=cat.y-k.y,d=Math.max(1,Math.hypot(dx,dy)),m=Math.min(10,d*.3);
+  k.chaseM=k.mode;k.mode='chase';k.cw=0;k.way=[[k.x+dx/d*m,k.y+dy/d*m]];
+}
+function stepChase(k,dt){                      /* 따라가다 → 1.5초 멈춰 바라보기 → 하던 일로 */
+  if(k.cw>0){k.cw-=dt;if(k.cw<=0){k.mode=k.chaseM;k.wait=.5}}
+  else if(walkWay(k,dt,2)){k.cw=1.5;k.face=cat.x>k.x?1:-1;setFrame(k,0,k.face>0);k.spr.style.marginBottom='0px'}
+  place(k);
+}
+
+/* 큰 놀이(체육대회·수업 종·기념사진·소나기·눈싸움)는 한 번에 하나만 (운동장 술래잡기는 2026-10-25 사용자 요청으로 뺌) */
+const busy=()=>!!(sports||bell||photo||rain||snow);
+const leads=()=>new Set(kids.filter(k=>k.lead).map(k=>k.lead));   /* 따라 걷는 친구가 있는 학생 — 놀이에 데려가면 친구가 따라와 어수선해서 뺌 */
+function joinable(k){return !k.tch&&!k.off&&!['senior','in','go','back','chase'].includes(k.mode)&&k.mode!=='follow'&&!leads().has(k)}
+function startGame(L){L.forEach(k=>{k.save={mode:k.mode,x:k.x,y:k.y,face:k.face};if(k.bub){k.bub.remove();k.bub=null}})}
+function endGame(L){for(const k of L){const to=homeOf(k);k.mode='back';k.spr.style.marginBottom='0px';k.way=routeTo(k.x,k.y,to[0],to[1])}}
+
+/* ── 숨은 재미 ⑦ 소나기 — 창조관 앞 차양을 연달아 세 번(TAPS) 누르면 비가 내리고 학생들이 '비다!' 하며 차양 기둥 앞(처마 밑)으로 뛰어가 비를 피함.
+   14초 뒤 비가 그치면 '비 그쳤다!' 하고 흩어짐. 겨울엔 없음(눈이 오고 있어서) (2026-10-25) ── */
+const CANOPY=[[835,252],[1130,405]];          /* 차양 지붕 — 누르는 곳은 이 선 둘레 16px */
+/* 비 피하는 자리 — 차양 앞 기둥 바깥 계단에 한 줄, 최대 12자리. 차양에 가까운 학생만 옴 (2026-10-25)
+   너무 반듯하지 않게 비가 올 때마다 새로: 간격 17~26px(17 보다 가까우면 겹침), 기둥선에서 9~15px 앞
+   (9px 보다 안쪽이면 머리끝이 지붕 가장자리 위로 튀어나옴 — 그림 속 차양 높이 약 23px < 학생 키 약 32px).
+   지붕 아래 안줄도 있었지만 앞줄과 겹쳐 보여서 뺌 */
+function rainSpots(){const S=[];for(let x=848+rnd()*6;x<1086&&S.length<12;x+=17+rnd()*9)S.push([x,CANOPY_YF(x)+9+rnd()*6]);return S}
+let rain=null;
+function nearCanopy(x,y){const [[ax,ay],[bx,by]]=CANOPY,t=Math.max(0,Math.min(1,((x-ax)*(bx-ax)+(y-ay)*(by-ay))/((bx-ax)**2+(by-ay)**2)));
+  return Math.hypot(x-(ax+(bx-ax)*t),y-(ay+(by-ay)*t))<16}
+function rainFx(on){
+  let r=$('rain');
+  if(!r){r=document.createElement('div');r.id='rain';for(let i=0;i<160;i++){const e=document.createElement('i');
+    e.style.cssText=`left:${rnd()*115}%;animation-duration:${.55+rnd()*.35}s;animation-delay:${-rnd()}s;opacity:${.45+rnd()*.4}`;r.appendChild(e)}
+    $('stage').appendChild(r)}
+  requestAnimationFrame(()=>r.classList.toggle('on',on));
+}
+function startRain(){
+  if(busy()||SEA==='겨울')return;found('rain');
+  rainFx(true);
+  /* 차양에 가까운 학생부터 자리 수만큼 — 나머지는 하던 일 그대로 */
+  const S=rainSpots(),near=k=>Math.min(...S.map(p=>Math.hypot(p[0]-k.x,p[1]-k.y)));
+  const L=kids.filter(joinable).sort((a,b)=>near(a)-near(b)).slice(0,S.length);startGame(L);
+  L.forEach(k=>{const j=S.reduce((bi,p,i)=>Math.hypot(p[0]-k.x,p[1]-k.y)<Math.hypot(S[bi][0]-k.x,S[bi][1]-k.y)?i:bi,0),p=S.splice(j,1)[0];
+    k.spot=p;k.mode='go';k.way=routeTo(k.x,k.y,p[0],p[1])});
+  const r=stage.getBoundingClientRect(),V2=L.filter(k=>{const [x,y]=toScreen(k.x,k.y);return x>0&&x<r.width&&y>0&&y<r.height*.85});
+  /* 남자 선생님 — '처마 밑으로 피해!' 하고 차양 동쪽 끝 기둥 앞으로. 선생님이 없으면 학생이 '빨리 피하자!' */
+  const T=freeT(TM);
+  if(T){T.mode='tgo';T.way=routeTo(T.x,T.y,...TSHELTER());T.then=k=>{k.mode='stand';k.face=-1;setFrame(k,0,false)};
+    setTimeout(()=>{if(rain)say(T,'비 온다! 얼른 처마 밑으로 피해!',2.6)},600)}
+  const a=pick(V2.length?V2:L);say(a,'비다!',2);const b=!T&&pick(V2.filter(k=>k!==a));if(b)setTimeout(()=>{if(rain&&!b.bub)say(b,'빨리 피하자!',2)},600);
+  rain={t:0,phase:'run',L};
+}
+function stepRain(dt){
+  const R=rain;R.t+=dt;
+  if(R.phase==='run'){
+    /* 도착하면 보는 방향 제각각 — 반은 앞(왼쪽 아래), 나머지는 가장 가까운 친구 쪽이나 오른쪽 */
+    for(const k of R.L)if(k.mode==='go'&&!k.way.length){k.mode='rain';k.spr.style.marginBottom='0px';
+      const nb=R.L.filter(o=>o!==k&&o.mode==='rain').sort((a,b)=>Math.hypot(a.x-k.x,a.y-k.y)-Math.hypot(b.x-k.x,b.y-k.y))[0],q=rnd();
+      k.face=q<.5?-1:q<.8&&nb?(nb.x>k.x?1:-1):1;setFrame(k,0,k.face>0);place(k)}
+    const W=R.L.filter(k=>k.mode==='rain');
+    for(const k of W)if(rnd()<dt*.12){k.face=-k.face;setFrame(k,0,k.face>0)}   /* 기다리는 동안 가끔 두리번 */
+    for(const [t,w] of [[7,'비 언제 그치지?'],[10,'우산 가져올걸']])if(R.t>=t&&R.t-dt<t&&W.length){const k=pick(W);if(!k.bub)say(k,w,2.2,true)}
+    if(R.t>14){R.phase='clear';R.t=0;rainFx(false);if(W.length)say(pick(W),'비 그쳤다!',2)}
+    return;
+  }
+  if(R.phase==='clear'&&R.t>1.5){R.phase='back';endGame(R.L);teacherBack(TM);return}
+  if(R.phase==='back'&&R.L.every(k=>k.mode!=='back'))rain=null;
+}
+
+/* ── 숨은 재미 ⑧ 겨울 눈싸움 — 겨울에 눈사람을 연달아 세 번(TAPS) 누르면 가까운 6명이 눈사람 양옆으로 3명씩 갈라 서서
+   하얀 눈뭉치를 주고받음. 맞으면 가끔 '앗 차가워!'. 7초 뒤 '재밌었다!' 하고 하던 일로 (2026-10-25, 14초 → 7초) ── */
+const SNOWTEAM=[[[716,352],[729,345],[742,353]],[[792,338],[803,324],[810,347]]];   /* 왼편은 오른쪽 벤치(711~741, ~333) 앞 */
+let snow=null;
+function startSnow(){
+  if(busy()||SEA!=='겨울')return;found('snow');
+  const C=[765,335],L=kids.filter(joinable).sort((a,b)=>Math.hypot(a.x-C[0],a.y-C[1])-Math.hypot(b.x-C[0],b.y-C[1])).slice(0,6);
+  if(L.length<6)return;startGame(L);
+  L.forEach((k,i)=>{k.team=i%2;const p=SNOWTEAM[k.team][i>>1];k.spot=p;k.mode='go';k.way=routeTo(k.x,k.y,p[0],p[1])});
+  say(L[0],'눈싸움하자!',2);
+  snow={t:0,phase:'gather',L,balls:[],next:.5};
+}
+function throwSnow(S){
+  const A=S.L.filter(k=>k.cool<=0||k.cool===undefined),f=pick(A.length?A:S.L),T=S.L.filter(k=>k.team!==f.team),t=pick(T);
+  f.cool=.9;setFrame(f,5,f.face>0);setTimeout(()=>{if(snow&&f.mode==='snow')setFrame(f,0,f.face>0)},350);
+  const el=document.createElement('div');el.className='snowball';$('world').appendChild(el);
+  S.balls.push({el,x0:f.x,y0:f.y-22,x1:t.x+(rnd()-.5)*6,y1:t.y-16,t:0,d:.55,to:t});
+}
+function stepSnow(dt){
+  const S=snow;S.t+=dt;
+  for(let i=S.balls.length-1;i>=0;i--){const b=S.balls[i];b.t+=dt;const f=Math.min(1,b.t/b.d),x=b.x0+(b.x1-b.x0)*f,y=b.y0+(b.y1-b.y0)*f-Math.sin(f*Math.PI)*16;
+    b.el.style.transform=`translate(${x-1.6}px,${y-1.6}px)`;b.el.style.zIndex=Math.round(Math.max(b.y0,b.y1)+20);
+    if(f>=1){b.el.remove();S.balls.splice(i,1);const k=b.to;if(k.mode==='snow'){k.el.classList.remove('hop');void k.el.offsetWidth;k.el.classList.add('hop');
+      if(rnd()<.3&&!k.bub)say(k,pick(['앗 차가워!','으, 차가워!','맞았다!']),1.4,true)}}}
+  if(S.phase==='gather'){
+    if(S.L.every(k=>k.mode!=='go'||!k.way.length)||S.t>15){S.phase='fight';S.t=0;
+      for(const k of S.L){[k.x,k.y]=k.spot;k.mode='snow';k.face=k.team?-1:1;k.cool=rnd()*.8;k.spr.style.marginBottom='0px';setFrame(k,0,k.face>0);place(k)}}
+    return;
+  }
+  if(S.phase==='fight'){
+    for(const k of S.L)k.cool-=dt;S.next-=dt;if(S.next<=0){S.next=.35+rnd()*.4;throwSnow(S)}
+    if(S.t>4.2){S.phase='back';                 /* 7초 → 4.2초 (2026-10-29 사용자 요청, 40% 줄임) */say(pick(S.L),'재밌었다!',2);setTimeout(()=>{if(snow)endGame(S.L)},600)}
+    return;
+  }
+  if(S.phase==='back'&&!S.balls.length&&S.L.every(k=>k.mode!=='back'&&k.mode!=='snow'))snow=null;
+}
+
+/* ── 숨은 재미를 찾으면 조작줄 위에 '숨은 재미 발견!' 알림만 잠깐 (몇 개 찾았는지·별 표시는 사용자 요청으로 뺌, 2026-10-24).
+   같은 것은 한 번만 알리고, 1분 동안 아무도 안 만져 처음 모습으로 돌아갈 때 다시 처음부터 ── */
+const FUNS={cat:'귀찮은 고양이',sports:'체육대회',senior:'옛 동명 선배',bell:'수업 종',bag:'가방 멘 친구',photo:'100주년 기념사진',
+  rain:'소나기',snow:'눈싸움'};
+const got=new Set();let toastT=null;
+function toast(t){const e=$('toast');e.textContent=t;e.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>e.classList.remove('on'),3500)}
+/* 오른쪽 위 '숨은 재미 ○ / 8 찾음' — 2026-10-24 에 개수 표시를 뺐다가 2026-10-29 사용자 요청으로 다시 (도전 의식) */
+function showFuns(pop){
+  const n=got.size,all=Object.keys(FUNS).length;$('funN').textContent=n;$('funAll').textContent=all;
+  $('funDots').innerHTML=Array.from({length:all},(_,i)=>`<i${i<n?' class="on"':''}></i>`).join('');
+  if(pop){const e=$('funs');e.classList.remove('pop');void e.offsetWidth;e.classList.add('pop')}
+}
+function found(k){if(got.has(k))return;got.add(k);showFuns(true);
+  toast(got.size===Object.keys(FUNS).length?'숨은 재미를 모두 찾았어요!':`숨은 재미 발견! '${FUNS[k]}'`)}
+
+/* 걸음 그림 — 아래로 가면 앞모습(걷기A·서기·걷기B·서기), 위로 가면 뒷모습(걷기A·B). iv = 한 발 시간 */
+function walkFrame(k,dy,iv){
+  const L=k.face<0,f4=Math.floor(k.ph/iv)%4;
+  /* 위로 갈 때 — 뒷모습 서기가 있으면 아래로 갈 때처럼 걷기A·서기·걷기B·서기(칸 8·7·9·7), 없으면 옛 뒷모습 두 장 */
+  if(dy>=0)setFrame(k,[1,0,2,0][f4],!L);else setFrame(k,k.n>=10?[8,7,9,7][f4]:f4<2?3:4,L);
+  k.spr.style.marginBottom=(f4%2?0:1.2)+'px';
+}
+/* 트랙 달리기 고리 — 운동장 동쪽, 조회대와 겹치지 않는 작은 타원 */
+const JOG={cx:968,cy:474,a:112,b:46,ang:21.3*Math.PI/180};
+function jogAt(t){const u=Math.cos(t)*JOG.a,v=Math.sin(t)*JOG.b;
+  return [JOG.cx+u*Math.cos(JOG.ang)-v*Math.sin(JOG.ang),JOG.cy+u*Math.sin(JOG.ang)+v*Math.cos(JOG.ang)]}
+/* 모여 있는 친구들끼리 하는 말 — 같은 학년 친구에게 하는 반말 (사용자가 준 목록, 15번까지)
+   [말, 어울리는 대답들] — 대답은 그 말에 맞는 것 중에서만 고름 (아무 맞장구나 붙이면 내용이 어긋남).
+   요즘 말투: '헐'·'헤헤'·물결표 없이, '미쳤다·ㅁㅊ'는 전시물이라 쓰지 않음 */
+const TALK=[
+  ['야, 다음 시간 이동 수업 맞지?',['응, 과학실!','맞아, 빨리 가자!','엥? 그랬어?']],
+  ['나 형광펜 한 번만 빌려주라!',['여기!','무슨 색?','ㅇㅋ, 금방 줘!']],
+  ['아니 오늘 급식 메뉴 봤어?',['돈가스래!','아직 못 봤어','대박, 뭔데?']],
+  ['같이 급식실 뛰어가자, 줄 길어지겠다!',['콜!','잠깐만, 같이 가!','가자 가자!']],
+  ['아까 나눠준 유인물 남는 거 있어?',['나 한 장 더 있어!','앞에 남았던데?','나도 없어 ㅠㅠ']],
+  ['너 수행평가 주제 뭐로 정했어?',['아직 고민 중...','비밀!','너는 정했어?']],
+  ['쉬는 시간에 같이 물 뜨러 갈래?',['좋아!','나도 갈래!','콜!']],
+  ['오늘 방과후 끝나고 도서관 갈 거지?',['당연하지!','응, 같이 가자','오늘은 학원이라 ㅠㅠ']],
+  ['야, 앞머리 안 갈라졌나 한 번만 봐줘!',['완전 괜찮아!','살짝? 이제 됐어','예쁜데?']],
+  ['체육복 바지 빌려줄 수 있어? 깜빡했어!',['사물함에 있어, 가져가!','나도 오늘 체육 있어 ㅠㅠ','ㅇㅋ, 이따 줄게']],
+  ['아까 선생님 말씀하신 시험 범위 어디까지랬지?',['3단원까지!','나도 못 들었어','엥? 범위 나왔어?']],
+  ['너 오늘 발표 진짜 잘하더라!',['진짜? 고마워!','엄청 떨렸어','아 부끄러워!']],
+  ['교무실 갈 건데 같이 가 줄 사람?',['나!','같이 가자!','무슨 일인데?']],
+  ['이번 축제 때 동아리 부스 뭐 할지 정했어?',['아직!','포토존 어때?','회의해야 돼!']],
+  ['사물함 열쇠가 어디 갔지?',['주머니 봐봐!','또 잃어버렸어?','아까 책상 위에 있던데?']]];
+/* 혼자 걷는 학생의 혼잣말 (사용자가 준 목록을 교정 밖 상황·요즘 말투에 맞게 다듬음, 마침표 없이) */
+const MONO=['아 맞다, 사물함에 체육복 두고 왔다','오늘 급식 뭐였지? 식단표 봐야겠다','앞머리 왜 이래... 거울 좀 봐야겠네',
+  '어? 내 필통 어디 갔지? 책상에 뒀나?','다음 시간 과학실 이동 수업 맞나?','물 마시고 싶은데 텀블러 어디 뒀더라',
+  '아까 외운 영단어 스펠링이 뭐였지...','종 치기 전에 문제 세 개만 더 풀어야지','오늘 날씨 진짜 좋다!','수행평가 제출 오늘 몇 시까지였지?',
+  '어디서 맛있는 냄새 난다. 오늘 메뉴 기대된다!','아, 프린트물 파일에 안 끼워놨네','교무실에 질문하러 지금 가도 되려나?',
+  '머리 고무줄 손목에 끼워둔 게 어디 갔지?','도서관에 빌린 책 오늘 반납일인가?','쉬는 시간 5분 남았네. 빨리 갔다 와야지',
+  '오늘 동아리 모임 몇 층에서 한다 그랬지?','이 문제 아까 본 건데 공식이 뭐였더라...'];
+const MONO_COLD=['손 너무 건조한데 핸드크림 발라야겠다','입술 다 텄네. 립밤 주머니에 있나?'];   /* 가을·겨울에만 */
+/* 계절 혼잣말 — 그 계절 그림일 때만 위 목록에 더해 나옴 (2026-10-24 추가) */
+const MONO_SEA={
+  봄:['꽃잎이 자꾸 머리에 붙네','새 학년이라 아직 반 친구들 이름 다 못 외웠다','봄이라 그런지 5교시만 되면 너무 졸려',
+    '중간고사 벌써 다음 달이네...','바람 선선하다. 걷기 딱 좋은 날씨'],
+  여름:['너무 덥다!','땀난다... 손선풍기 충전해 둘걸','시원한 음료수 마시고 싶다',
+    '방학까지 며칠 남았지?','햇빛 진짜 세다. 그늘로 걸어가야지'],
+  가을:[...MONO_COLD,'하늘 진짜 높고 파랗다','낙엽 밟는 소리 좋다','아침저녁으로 쌀쌀해졌네. 겉옷 챙길걸',
+    '축제 준비 오늘 몇 시부터였지?','중간고사 전에 계획표 다시 짜야겠다'],
+  겨울:[...MONO_COLD,'손 시려. 핫팩 챙겨 올걸','입김 나온다. 진짜 겨울이네','교실 히터 앞자리 부럽다',
+    '올해도 얼마 안 남았네','눈 더 많이 왔으면 좋겠다']};
+/* 혼잣말은 화면 전체에서 한 번에 한 명, 5초쯤에 한 번. 친구와 짝지어 걷는 학생은 빼고,
+   지금 화면에 보이고 근처에 다른 말풍선이 없는 학생만. 같은 말은 최근 6개 안에서 다시 안 나옴 */
+const mono={t:6,k:null,recent:[]};
+function stepMono(dt){
+  if(mono.k&&!mono.k.bub)mono.k=null;
+  mono.t-=dt;if(mono.t>0||mono.k)return;mono.t=4.5+rnd();          /* 약 5초마다 (말풍선 3.4초 + 쉼) */
+  const pairs=new Set(kids.filter(k=>k.lead).flatMap(k=>[k,k.lead])),r=$('stage').getBoundingClientRect();
+  const C=kids.filter(k=>k.mode==='path'&&!k.off&&!pairs.has(k)&&!k.bub&&kids.every(o=>!o.bub||Math.hypot(o.x-k.x,o.y-k.y)>90)&&(()=>{
+    const [x,y]=toScreen(k.x,k.y);return x>r.width*.05&&x<r.width*.95&&y>r.height*.12&&y<r.height*.85})());
+  if(!C.length)return;
+  const pool=[...MONO,...(MONO_SEA[SEA]||[])].filter(s=>!mono.recent.includes(s)),line=pick(pool),k=pick(C);
+  mono.recent=[line,...mono.recent].slice(0,6);
+  if(k.bub)k.bub.remove();k.bub=document.createElement('div');k.bub.className='bub think';k.bub.textContent=line;k.bubT=3.4;
+  $('stage').appendChild(k.bub);mono.k=k;
+}
+/* 수다 — 누르지 않아도 한 명씩 돌아가며 말하고(3.2초), 말풍선이 사라지면 다른 친구가 그 말에 맞는 대답.
+   말풍선이 겹치지 않게 한 번에 한 명만. 같은 말은 최근 5개 안에서 다시 안 나옴 */
+const talk={t:2,reply:null,ans:null,rt:0,last:null,recent:[]};
+function stepTalk(dt){
+  const G=kids.filter(k=>k.mode==='chat');if(G.length<2)return;
+  if(talk.reply){talk.rt-=dt;if(talk.rt<=0){const r=talk.reply;talk.reply=null;if(!r.bub&&r.mode==='chat'){say(r,talk.ans,1.8,true);r.chatT=.6}}}
+  talk.t-=dt;if(talk.t>0)return;
+  const who=G.filter(k=>k!==talk.last&&!k.bub),k=who.length?pick(who):null;if(!k){talk.t=1;return}
+  let T;do T=pick(TALK);while(talk.recent.includes(T[0]));talk.recent=[T[0],...talk.recent].slice(0,5);
+  say(k,T[0],3.2);k.chatT=.8;talk.last=k;
+  const others=G.filter(o=>o!==k);talk.reply=rnd()<.85?pick(others):null;talk.ans=pick(T[1]);talk.rt=3.4;
+  talk.t=9+rnd()*2.5;                          /* 다음 말까지 9~11.5초 (사용자 요청으로 3초 늘림) */
+}
+function say(k,text,sec,small){
+  if(k.bub)k.bub.remove();
+  k.bub=document.createElement('div');k.bub.className='bub'+(small?' sm':'');k.bub.textContent=text;k.bubT=sec;$('stage').appendChild(k.bub);
+}
+
+/* ── 삼색 고양이 — 기와집 옆 숲(잘 안 보이는 곳)을 슬금슬금. 걷다가 앉아 그루밍하거나 웅크려 잠 ── */
+/* 나무·가로등 뒤로 지나가지 않는 길만 (catzone.py 로 네 계절 겹침 검사) — 한옥 옆 ~ 꽃밭 둘레 */
+const CATN={c1:[203,403],c2:[236,402],c3:[264,352],c4:[288,340],c5:[300,392],c6:[262,410],
+  /* 동상 오른쪽 잔디 — 소나무 오른쪽 둥근 덤불에서 나와 벤치(x 711~741) 오른쪽까지만 (2026-10-24 추가) */
+  s1:[800,324],s2:[776,334],s3:[752,332],s4:[746,318],s5:[772,318],
+  /* 향상관 앞 덤불 ~ 빨간 나무·주황 나무 사이 잔디 (2026-10-24 추가) */
+  h1:[1285,488],h2:[1262,503],h3:[1250,522],h4:[1222,512],h5:[1280,520]};
+const CATE='c1-c2 c2-c6 c6-c5 c2-c3 c3-c4 c4-c5 s1-s2 s2-s3 s3-s4 s4-s5 s5-s1 s5-s2 h1-h2 h2-h3 h3-h4 h4-h2 h3-h5 h5-h1';
+/* 고양이가 나타나는 곳 세 군데 — 처음과 달아났다 돌아올 때마다 무작위로 한 곳. door = 덤불에서 나와 처음 서는 점, hide = 숨는 덤불 */
+const CATAREAS=[{door:'c1',hide:HIDE},{door:'s1',hide:[818,312]},{door:'h1',hide:[1290,470]}];   /* 한옥 덤불(HIDE)은 옛 선배와 같이 씀 */
+const CNB={};CATE.split(' ').forEach(e=>{const [a,b]=e.split('-');(CNB[a]=CNB[a]||[]).push(b);(CNB[b]=CNB[b]||[]).push(a)});
+let cat=null;
+/* 고양이 그림 — ChatGPT 그림을 칸으로 정리한 것(작은동명/고양이_칸.png). 0 서기,1 앉기,2 그루밍,3 낮잠,4 깡충,5~8 걷기. 모두 왼쪽을 봄 */
+const CA=window.CATART,CATH=15;               /* 고양이 키(그림 px) — 학생 키(34)의 절반쯤 */
+function makeCat(){
+  const w=CATH*CA.cw/CA.ch,el=document.createElement('div');el.className='cat';
+  el.style.cssText=`width:${w}px;height:${CATH}px;margin:${-CATH}px 0 0 ${-w/2}px`;
+  el.innerHTML=`<i class="shadow"></i><div class="spr" style="background-image:url('${encodeURI(CA.src)}')"></div>`;
+  $('world').appendChild(el);
+  const A=pick(CATAREAS),[x,y]=CATN[A.door];
+  cat={el,spr:el.querySelector('.spr'),area:A,node:A.door,prev:null,x,y,tx:x,ty:y,state:'walk',t:0,face:-1,ph:0,hop:0,bub:null,fi:-1};
+  catFrame(0);placeCat();
+}
+function catFrame(i){if(cat.fi===i)return;cat.fi=i;cat.spr.style.backgroundPosition=`${i*100/(CA.n-1)}% 0`}
+function placeCat(){const s=scaleAt(cat.y);cat.el.style.transform=`translate(${cat.x}px,${cat.y}px) scale(${s})`;
+  cat.spr.style.transform=cat.face>0?'scaleX(-1)':'';cat.el.style.zIndex=Math.round(cat.y)}
+function setCat(st){cat.state=st}
+/* ── 숨은 재미 ① 귀찮은 고양이 — 연달아 세 번(TAPS) 누르면 짜증 낙서 말풍선을 띄우고 가까운 덤불로 달아나 사라졌다가
+   1분 뒤 세 곳(한옥 옆·동상 옆·향상관 앞) 중 무작위 한 곳의 덤불에서 슬그머니 나옴 ── */
+function catPath(a,b){                         /* 고양이 길에서 a→b 가장 짧은 점 순서 */
+  const prev={[a]:null},q=[a];
+  while(q.length){const n=q.shift();if(n===b)break;for(const m of CNB[n])if(!(m in prev)){prev[m]=n;q.push(m)}}
+  const p=[];for(let n=b;n;n=prev[n])p.unshift(n);return p;
+}
+function catFlee(){
+  cat.way=[...catPath(cat.node,cat.area.door).map(n=>CATN[n]),cat.area.hide];cat.state='flee';cat.hop=0;found('cat');chaseCat();
+  /* 달아날 때마다 짜증_1(핏줄)·짜증_2(낙서)·짜증_3(화난 고양이 얼굴) 그림을 차례로. 그림 파일이 없으면 코드로 그린 낙서+핏줄 말풍선 */
+  if(cat.bub)cat.bub.remove();const b=cat.bub=document.createElement('div');cat.bubT=2.2;
+  /* 핏줄(1)·낙서(2)·고양이 얼굴(3)을 처음부터 각각 1/3 확률로 (사용자 요청) */
+  const n=1+Math.floor(Math.random()*3);b.className='bub grrimg';
+  const im=new Image();im.alt='';im.src=`작은동명/짜증_${n}.png`;
+  im.onerror=()=>{b.className='bub grr';b.innerHTML=SCRIBBLE+VEIN};
+  b.appendChild(im);$('stage').appendChild(b);
+}
+/* 꼬불꼬불 낙서 뭉치 — 큰 원을 돌면서 작은 고리를 여러 번 그리는 선(트로코이드)을 살짝 흐트러뜨림 */
+const SCRIBBLE=(()=>{let d='';for(let i=0;i<=320;i++){const t=i/320*Math.PI*6,
+  x=50+16*Math.cos(t)+17*Math.cos(t*2.7)+8*Math.sin(t*5.3),y=40+12*Math.sin(t*1.1)+14*Math.sin(t*2.7)+6*Math.cos(t*4.9);
+  d+=(i?'L':'M')+x.toFixed(1)+' '+y.toFixed(1)}
+  return `<svg viewBox="0 0 100 80"><path d="${d}" fill="none" stroke="#2a2440" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`})();
+/* 만화의 빨간 핏줄 표시 — 가운데를 향해 휜 네 개의 곡선 */
+const VEIN='<svg class="vein" viewBox="0 0 40 40"><path d="M5 16Q16 16 16 5M24 5Q24 16 35 16M35 24Q24 24 24 35M16 35Q16 24 5 24" fill="none" stroke="#e5383b" stroke-width="5" stroke-linecap="round"/></svg>';
+function catReturn(){
+  const A=cat.area=pick(CATAREAS);
+  [cat.x,cat.y]=A.hide;cat.el.style.visibility='';cat.el.style.opacity=0;
+  setTimeout(()=>cat.el.style.opacity=1,40);
+  cat.way=[CATN[A.door]];cat.state='back';cat.node=A.door;cat.prev=null;
+}
+function stepCat(dt){
+  if(!cat)return;cat.ph+=dt;
+  if(cat.state==='gone'){cat.t-=dt;if(cat.t<=0)catReturn();return}
+  if(cat.state==='flee'||cat.state==='back'){
+    const [tx,ty]=cat.way[0],dx=tx-cat.x,dy=ty-cat.y,d=Math.hypot(dx,dy),fast=cat.state==='flee';
+    if(d<.8){cat.way.shift();
+      if(fast&&cat.way.length===1)cat.el.style.opacity=0;          /* 덤불로 들어가며 사라짐 */
+      if(!cat.way.length){if(fast){cat.state='gone';cat.t=60;cat.el.style.visibility='hidden'}else{cat.state='walk';cat.tx=cat.x;cat.ty=cat.y}}}
+    else{const v=Math.min(d,(fast?40:9)*dt);cat.x+=dx/d*v;cat.y+=dy/d*v;if(Math.abs(dx)>.3)cat.face=dx<0?-1:1;
+      catFrame(5+Math.floor(cat.ph/(fast?.06:.14))%4)}
+    placeCat();return;
+  }
+  if(cat.hop>0){cat.hop-=dt;catFrame(4);placeCat();return}       /* 눌렀을 때 깡충 */
+  if(cat.state==='sit'){cat.t-=dt;catFrame(Math.floor(cat.ph/.7)%3===2?2:1);if(cat.t<=0)setCat('walk');placeCat();return}  /* 앉아서 가끔 그루밍 */
+  if(cat.state==='sleep'){cat.t-=dt;catFrame(3);if(cat.t<=0)setCat('walk');placeCat();return}
+  const dx=cat.tx-cat.x,dy=cat.ty-cat.y,d=Math.hypot(dx,dy);
+  if(d<.6){
+    const r=rnd();catFrame(0);
+    if(r<.22){setCat('sit');cat.t=4+rnd()*5}
+    else if(r<.32){setCat('sleep');cat.t=8+rnd()*10}
+    const nb=CNB[cat.node].filter(n=>n!==cat.prev);const nx=pick(nb.length?nb:CNB[cat.node]);cat.prev=cat.node;cat.node=nx;[cat.tx,cat.ty]=CATN[nx];
+  }else{const v=Math.min(d,9*dt);cat.x+=dx/d*v;cat.y+=dy/d*v;if(Math.abs(dx)>.3)cat.face=dx<0?-1:1;
+    catFrame(5+Math.floor(cat.ph/.14)%4)}                      /* 걷기 4장 */
+  placeCat();
+}
+function pokeCat(){if(['flee','gone','back'].includes(cat.state))return;
+  let fled=false;egg('cat',TAPS,()=>{fled=true;catFlee()});if(fled)return;
+  if(cat.state==='sleep')setCat('sit'),cat.t=3;cat.hop=.6;
+  if(cat.bub)cat.bub.remove();cat.bub=document.createElement('div');cat.bub.className='bub';cat.bub.textContent=pick(['야옹~','냐앙','미야오~']);cat.bubT=2.5;$('stage').appendChild(cat.bub)}
+function poke(k){
+  if(k.react>0&&k.reactT-k.react<.8)return;   /* 깡충 뛰는 동안만 다시 누르기 막음 — 서서 말하는 중엔 다시 누르면 새 말 */
+  k.el.classList.remove('hop');void k.el.offsetWidth;k.el.classList.add('hop');
+  if(k.bub)k.bub.remove();
+  k.bub=document.createElement('div');k.bub.className='bub';k.bub.textContent=pick(k.tch?TSAY:k.mode==='senior'?OLDSAY:k.st==='가방'?BAGSAY:SAY);if(k.st==='가방')found('bag');k.bubT=Math.max(3,k.bub.textContent.length*.13);   /* 긴 말은 읽을 시간만큼 더 (25자 → 약 3.3초, 30자 → 약 3.9초) */$('stage').appendChild(k.bub);
+  /* 깡충+손 흔들기 0.8초 → 앞을 보고 서서 말풍선이 사라질 때까지 → 손 한 번 더 흔들고(0.5초) 하던 일로 (2026-10-29 사용자 요청, 전엔 0.8초 뒤 바로 걸어감) */
+  k.react=k.reactT=k.bubT+.5;
+}
+/* 눌렸을 때 그림 — 처음 0.8초와 마지막 0.5초는 손 흔들기(5), 그 사이는 서기(0) */
+const reactFrame=k=>k.reactT-k.react<.8||k.react<.5?5:0;
+
+/* ── 보기: 그림 전체가 화면에 들어오는 크기 = 1배, 최대 3배 (2026-10-24 사용자 요청, 2.4 → 3) ──
+   화면 전체를 쓰되, 그림 y 945(경영고 앞)까지는 아래 버튼 줄 위에 오게 — 그 아래 받침대 테두리만 버튼 뒤로 들어감.
+   그림이 화면보다 낮을 때는 위에 붙임 */
+const V={z:1,cx:768,cy:512},HOME={z:1,cx:768,cy:0};let fit=1;
+const KEEP=945;
+function layout(){
+  const r=$('stage').getBoundingClientRect(),bar=$('reach').getBoundingClientRect().top-r.top-r.width*.006;
+  fit=Math.min(r.width/1536,r.height/1024,bar/KEEP);
+  V.z=Math.max(1,Math.min(3,V.z));
+  const s=fit*V.z,hw=r.width/2/s,hh=r.height/2/s;
+  V.cx=hw>=768?768:Math.max(hw,Math.min(1536-hw,V.cx));V.cy=hh>=512?hh:Math.max(hh,Math.min(1024-hh,V.cy));
+  $('world').style.transform=`translate(${r.width/2-V.cx*s}px,${r.height/2-V.cy*s}px) scale(${s})`;
+}
+const toScreen=(x,y)=>{const r=$('stage').getBoundingClientRect(),s=fit*V.z;return [r.width/2+(x-V.cx)*s,r.height/2+(y-V.cy)*s]};
+const toWorld=(sx,sy)=>{const r=$('stage').getBoundingClientRect(),s=fit*V.z;return [V.cx+(sx-r.left-r.width/2)/s,V.cy+(sy-r.top-r.height/2)/s]};
+let anim=null;
+function animTo(z,cx,cy){anim={z,cx,cy}}
+function viewHome(){animTo(HOME.z,HOME.cx,HOME.cy);ping()}
+
+/* multi: 이번 터치에서 두 손가락을 썼는지 — 쓴 뒤에는 손가락을 모두 뗄 때까지 끌기·누르기 안 함
+   (확대·축소 후 한 손가락이 늦게 떨어지면 화면이 그 손가락을 따라가던 문제, 2026-10-29) */
+const ptr=new Map();let g2=null,multi=false;const stage=$('stage');
+stage.addEventListener('pointerdown',e=>{
+  stage.setPointerCapture(e.pointerId);ptr.set(e.pointerId,{x:e.clientX,y:e.clientY,x0:e.clientX,y0:e.clientY,t:performance.now()});
+  stage.classList.add('drag');anim=null;ping();
+  if(ptr.size>=2)multi=true;
+  if(ptr.size===2){const [a,b]=[...ptr.values()];g2={d:Math.hypot(a.x-b.x,a.y-b.y),z:V.z,w:toWorld((a.x+b.x)/2,(a.y+b.y)/2)}}
+});
+stage.addEventListener('pointermove',e=>{
+  const p=ptr.get(e.pointerId);if(!p)return;const dx=e.clientX-p.x,dy=e.clientY-p.y;p.x=e.clientX;p.y=e.clientY;
+  const s=fit*V.z;
+  if(ptr.size===1&&!multi){V.cx-=dx/s;V.cy-=dy/s;layout()}
+  else if(ptr.size===2&&g2){const [a,b]=[...ptr.values()];V.z=Math.max(1,Math.min(3,g2.z*Math.hypot(a.x-b.x,a.y-b.y)/Math.max(1,g2.d)));
+    const r=stage.getBoundingClientRect(),s2=fit*V.z,mx=(a.x+b.x)/2-r.left,my=(a.y+b.y)/2-r.top;
+    V.cx=g2.w[0]-(mx-r.width/2)/s2;V.cy=g2.w[1]-(my-r.height/2)/s2;layout()}
+});
+function endPtr(e){
+  const p=ptr.get(e.pointerId);if(!p)return;ptr.delete(e.pointerId);if(ptr.size<2)g2=null;
+  const wasMulti=multi;if(!ptr.size){stage.classList.remove('drag');multi=false}
+  if(!wasMulti&&Math.hypot(e.clientX-p.x0,e.clientY-p.y0)<18&&performance.now()-p.t<500)tap(e.clientX,e.clientY);
+}
+stage.addEventListener('pointerup',endPtr);stage.addEventListener('pointercancel',endPtr);
+stage.addEventListener('wheel',e=>{e.preventDefault();V.z*=e.deltaY>0?1/1.1:1.1;layout();ping()},{passive:false});
+['contextmenu','selectstart','dragstart','gesturestart'].forEach(t=>window.addEventListener(t,e=>e.preventDefault(),true));
+function tap(sx,sy){eggUsed=false;tapAt(sx,sy);if(!eggUsed){eggKey=null;eggN=0}}
+function tapAt(sx,sy){
+  /* 학생 먼저 — 손가락 둘레 화면 폭 2.5% 안의 가장 가까운 학생 */
+  const r=stage.getBoundingClientRect(),lim=r.width*.025;let best=null,bd=1e9;
+  for(const k of kids){if(k.mode==='in'||k.off)continue;const s=scaleAt(k.y),[x,y]=toScreen(k.x,k.y-(k.h||KH)*.5*s);const d=Math.hypot(x+r.left-sx,y+r.top-sy);if(d<lim&&d<bd){bd=d;best=k}}
+  /* 옛 선배가 손가락 둘레에 있으면 옆을 지나는 학생보다 선배가 먼저 대답 — 선배 멘트(OLDSAY)만 나오게 */
+  if(senior&&!senior.dead){const s=scaleAt(senior.y),[x,y]=toScreen(senior.x,senior.y-KH*.5*s);const d=Math.hypot(x+r.left-sx,y+r.top-sy);if(d<lim){bd=d;best=senior}}
+  /* 조회대·기념관 위를 누를 때는 학생·고양이 몸을 거의 정확히 누른 경우만 학생·고양이로 (근처를 지나는 학생이 터치를 가로채지 않게) */
+  const [wx,wy]=toWorld(sx,sy),i=SPOTS.findIndex(S=>wx>=S[1]&&wx<=S[3]&&wy>=S[2]&&wy<=S[4]);
+  const onEgg=inStage(wx,wy)||(i>=0&&(SPOTS[i][0]==='기념관'||SPOTS[i][0].startsWith('설립자'))),near=lim*(onEgg?.4:1);
+  if(cat&&cat.state!=='gone'){const [x,y]=toScreen(cat.x,cat.y-CATH*.5*scaleAt(cat.y));const d=Math.hypot(x+r.left-sx,y+r.top-sy);if(d<near&&(!best||d<bd))return pokeCat()}
+  if(best&&bd<near)return poke(best);
+  if(tapProp(wx,wy))return;
+  if(inStage(wx,wy))return;                                            /* 조회대 — 이름은 안 띄움 */
+  /* 운동장 빈 곳 — 체육대회 달리기 (2026-10-25 조회대 → 운동장). 학생 가까이(터치 범위 1.6배 안)를 누른 건 세지 않음 —
+     움직이는 운동장 학생을 누르려다 빗나간 터치가 쌓여 체육대회가 시작되는 일이 있었음 */
+  if(inField(wx,wy)){if(best&&bd<lim*1.6)return;return egg('field',TAPS,startSports)}
+  if(nearCanopy(wx,wy))return egg('canopy',TAPS,startRain);           /* 창조관 앞 차양 — 소나기 (겨울 빼고) */
+  if(i>=0){labUntil[i]=performance.now()+3000;if(SPOTS[i][0]==='기념관')egg('hanok',TAPS,summonSenior);if(SPOTS[i][0]==='성실관')egg('bell',TAPS,ringBell);
+    if(SPOTS[i][0].startsWith('설립자'))egg('photo',TAPS,groupPhoto)}
+}
+function stepOverlay(dt){
+  /* 말풍선 꼬리(.bub::after, 0.9vw)만큼 더 올려서 꼬리 끝이 머리 위에 오게 — 꼬리가 고양이·학생을 가리지 않게 */
+  const now=performance.now(),TAIL=innerWidth*.009;
+  SPOTS.forEach((S,i)=>{const on=now<labUntil[i];labs[i].classList.toggle('on',on);
+    const [x,y]=toScreen((S[1]+S[3])/2,S[5]??S[2]+10);labs[i].style.left=x+'px';labs[i].style.top=y+'px'});
+  if(cat&&cat.bub){const s=scaleAt(cat.y),g=cat.bub.classList.contains('grrimg'),[x,y]=toScreen(cat.x,cat.y-(g?CATH*.95:CATH+2)*s);
+    cat.bub.style.left=x+'px';cat.bub.style.top=(y-(g?0:TAIL))+'px';
+    cat.bubT-=dt;if(cat.bubT<.3)cat.bub.style.opacity=0;if(cat.bubT<=0){cat.bub.remove();cat.bub=null}}
+  for(let i=pbubs.length-1;i>=0;i--){const p=pbubs[i],[x,y]=toScreen(p.x,p.y);p.b.style.left=x+'px';p.b.style.top=(y-TAIL)+'px';
+    p.t-=dt;if(p.t<.3)p.b.style.opacity=0;if(p.t<=0){p.b.remove();pbubs.splice(i,1)}}
+  for(const k of kids)if(k.bub){const s=scaleAt(k.y),[x,y]=toScreen(k.x,k.y-((k.h||KH)+2)*s);k.bub.style.left=x+'px';k.bub.style.top=(y-TAIL)+'px';
+    k.bubT-=dt;if(k.bubT<.3)k.bub.style.opacity=0;if(k.bubT<=0){k.bub.remove();k.bub=null}}
+}
+
+/* 계절 버튼 — 바꾸면 그 계절 그림·교복·소품으로, 학생 두 명이 계절 한마디 */
+SEAS.forEach(t=>{const b=document.createElement('button');b.textContent=t;
+  b.onclick=()=>{const ch=t!==SEA;setSeason(t);ping();if(ch)seasonCheer(t)};$('seasons').appendChild(b)});
+
+/* 키오스크 연결 · 60초 동안 손대지 않으면 처음 모습으로 */
+let lastAct=performance.now(),homed=false;
+function ping(){lastAct=performance.now();homed=false;if(parent!==window)parent.postMessage({lego:'active'},'*')}
+function closeMe(){if(parent!==window)parent.postMessage({lego:'close'},'*');else location.href='index5.html'}
+/* 닫기는 click 대신 손가락을 뗄 때 바로 — 터치에서는 손가락이 조금 밀리거나 오래 누르거나, 다른 손가락이 그림을 만지고 있으면
+   click 이 생기지 않아 숨은 재미가 벌어지는 동안 닫기가 안 먹혔음 (2026-10-29). 버튼 둘레 2vw 안에서 떼면 닫힘 */
+(()=>{const b=$('closeBtn');let down=null;
+  b.addEventListener('pointerdown',e=>{down=e.pointerId;try{b.setPointerCapture(e.pointerId)}catch(_){}});
+  b.addEventListener('pointerup',e=>{if(e.pointerId!==down)return;down=null;
+    const r=b.getBoundingClientRect(),m=innerWidth*.02;
+    if(e.clientX>r.left-m&&e.clientX<r.right+m&&e.clientY>r.top-m&&e.clientY<r.bottom+m)closeMe()});
+  b.addEventListener('pointercancel',()=>down=null);
+  b.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' ')closeMe()});
+  /* 키오스크 밖(웹에 올려 따로 열었을 때)에는 돌아갈 메뉴가 없으니 닫기 버튼을 숨김 (2026-10-30). 키오스크에선 늘 index5 안(iframe) */
+  if(parent===window)b.style.display='none';
+})();
+
+window.addEventListener('resize',layout);
+setSeason(SEA);buildKids();layout();showFuns();
+let last=performance.now();
+function loop(now){
+  requestAnimationFrame(loop);
+  const dt=Math.min(.06,(now-last)/1000);last=now;
+  if(anim){for(const k of ['z','cx','cy'])V[k]+=(anim[k]-V[k])*.18;if(Math.abs(anim.z-V.z)<.002&&Math.abs(anim.cx-V.cx)<.5)anim=null;layout()}
+  if(now-lastAct>60000&&!homed){homed=true;animTo(HOME.z,HOME.cx,HOME.cy);kids.forEach(k=>{if(k.bub){k.bub.remove();k.bub=null}});if(cat&&cat.bub){cat.bub.remove();cat.bub=null}if(cat&&cat.state==='gone')cat.t=0;got.clear();showFuns();
+    if(SEA!==todaySeason())setSeason(todaySeason())}   /* 앞 관람객이 고른 계절도 오늘 계절로 (2026-10-25) */
+  stepKids(dt);stepCat(dt);stepCritters(dt);stepOverlay(dt);
+}
+requestAnimationFrame(loop);
+/* 성능 확인용 — 주소 끝에 ?fps 를 붙여 열면 왼쪽 아래에 1초당 그린 장면 수가 나옵니다(관람객 화면에는 안 보임) */
+if(location.search.includes('fps')){
+  const m=document.createElement('div');m.style.cssText='position:fixed;left:1vw;bottom:16vh;z-index:9;padding:.4vw .8vw;background:#000a;color:#0f0;font:600 1.4vw monospace;border-radius:.4vw;bottom:9vw';
+  document.body.appendChild(m);let n=0,t0=performance.now(),worst=0,lt=t0;
+  (function f(x){n++;worst=Math.max(worst,x-lt);lt=x;if(x-t0>=1000){m.textContent=n+' fps · 가장 늦은 장면 '+worst.toFixed(0)+'ms'+
+    (AC?' · 소리 지연 '+Math.round(soundLag()*1000)+'ms (컴퓨터 '+Math.round((AC.outputLatency||AC.baseLatency||0)*1000)+' + TV '+Math.round(SOUND_TV*1000)+')':'');n=0;worst=0;t0=x}requestAnimationFrame(f)})(t0);
+}
+</script>
+</body>
+</html>
