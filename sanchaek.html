@@ -9,7 +9,7 @@
 @font-face{font-family:'Pretendard';font-weight:500;font-display:block;src:url('fonts/Pretendard-Medium.woff2') format('woff2')}
 @font-face{font-family:'Pretendard';font-weight:700;font-display:block;src:url('fonts/Pretendard-Bold.woff2') format('woff2')}
 @font-face{font-family:'NanumMyeongjo';font-weight:700;font-display:block;src:url('fonts/NanumMyeongjo-Bold.ttf') format('truetype')}
-:root{--bg:#FEEFE7;--paper:#F2EFE6;--muted:rgba(242,239,230,.62);--line:rgba(242,239,230,.18);--c4:#F5C518;
+:root{--u:max(1vw,11px);--bg:#FEEFE7;--paper:#F2EFE6;--muted:rgba(242,239,230,.62);--line:rgba(242,239,230,.18);--c4:#F5C518;
   --sans:'Pretendard','Malgun Gothic',sans-serif;--serif:'NanumMyeongjo','Batang',serif}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;overflow:hidden;touch-action:none;overscroll-behavior:none}
@@ -51,83 +51,90 @@ body{background:var(--bg);font-family:var(--sans);font-weight:300;user-select:no
 @keyframes flap{to{transform:scaleX(.45)}}
 /* 흩날리는 꽃잎·낙엽·눈 — 화면 위에서 천천히. transform·opacity 만 움직여 가볍게 */
 #fall{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:2}
-#fall i{position:absolute;top:-3vw;display:block;animation:fall linear infinite}
+#fall i{position:absolute;top:calc(-3*var(--u));display:block;animation:fall linear infinite}
 @keyframes fall{0%{transform:translate3d(0,0,0) rotate(0)}100%{transform:translate3d(var(--dx),110vh,0) rotate(var(--rot))}}
 .kid.old .spr{filter:sepia(.75) saturate(.7) brightness(.95)}
 .cat .spr{position:absolute;left:0;bottom:0;width:100%;height:100%;background-repeat:no-repeat;background-size:900% 100%}
 .cat .shadow{position:absolute;left:15%;bottom:-6%;width:70%;height:14%;border-radius:50%;background:rgba(90,50,30,.22)}
 /* 깡충 — transform 대신 translate 만 움직임. transform 을 쓰면 오른쪽을 보게 뒤집어 둔 그림(scaleX(-1))이 점프하는 동안 풀려 왼쪽을 봤음 (2026-10-25) */
 @keyframes hop{0%{translate:0 0}25%{translate:0 -28%}50%{translate:0 0}70%{translate:0 -12%}100%{translate:0 0}}
-.head{position:absolute;left:2vw;top:1.6vw;pointer-events:none;padding:1vw 1.6vw 1.1vw;border-radius:1vw;
-  background:rgba(255,255,255,.75);color:#12357F;box-shadow:0 .4vw 1.4vw rgba(60,30,20,.16);z-index:3}
-.head h1{font-family:var(--serif);font-weight:700;font-size:2.6vw;letter-spacing:.1em}
-.head p{margin-top:.5vw;font-size:1.3vw;opacity:.92}
-/* 말풍선 글자는 모두 1.3vw(약 16mm)로 통일, 최대 폭 19vw — 긴 말은 두 줄, 낱말 중간에서 끊지 않음.
+.head{position:absolute;left:calc(2*var(--u));top:calc(1.6*var(--u));pointer-events:none;padding:calc(1*var(--u)) calc(1.6*var(--u)) calc(1.1*var(--u));border-radius:calc(1*var(--u));
+  background:rgba(255,255,255,.75);color:#12357F;box-shadow:0 calc(.4*var(--u)) calc(1.4*var(--u)) rgba(60,30,20,.16);z-index:3}
+.head h1{font-family:var(--serif);font-weight:700;font-size:calc(2.6*var(--u));letter-spacing:.1em}
+.head p{margin-top:calc(.5*var(--u));font-size:calc(1.3*var(--u));opacity:.92}
+/* 말풍선 글자는 모두 calc(1.3*var(--u))(약 16mm)로 통일, 최대 폭 calc(19*var(--u)) — 긴 말은 두 줄, 낱말 중간에서 끊지 않음.
    말·혼잣말·맞장구는 글자 크기가 아니라 모양(꼬리·글자색)으로만 구분 */
-.bub{position:absolute;transform:translate(-50%,-100%);pointer-events:none;width:max-content;max-width:19vw;text-align:center;
+.bub{position:absolute;transform:translate(-50%,-100%);pointer-events:none;width:max-content;max-width:calc(19*var(--u));text-align:center;
   word-break:keep-all;line-height:1.35;z-index:2;
-  padding:.7vw 1.2vw;border-radius:1.2vw;background:#fff;color:#1b2440;font-size:1.3vw;font-weight:500;
-  box-shadow:0 .5vw 1.5vw rgba(0,0,0,.2);transition:opacity .3s linear}
-.bub.sm{padding:.55vw 1vw}
+  padding:calc(.7*var(--u)) calc(1.2*var(--u));border-radius:calc(1.2*var(--u));background:#fff;color:#1b2440;font-size:calc(1.3*var(--u));font-weight:500;
+  box-shadow:0 calc(.5*var(--u)) calc(1.5*var(--u)) rgba(0,0,0,.2);transition:opacity .3s linear}
+.bub.sm{padding:calc(.55*var(--u)) calc(1*var(--u))}
 .bub.notail::after{display:none}              /* 체육대회 승리 발표처럼 누가 말하는 게 아닌 말풍선 */
 /* 혼잣말 — 생각 풍선: 흐린 글자, 꼬리 대신 작은 동그라미 두 개 */
-.bub.think{color:#4a5170;border-radius:1.6vw;background:rgba(255,255,255,.93)}
+.bub.think{color:#4a5170;border-radius:calc(1.6*var(--u));background:rgba(255,255,255,.93)}
 .bub.think::after,.bub.think::before{content:'';position:absolute;left:50%;border:0;border-radius:50%;background:rgba(255,255,255,.93);
-  box-shadow:0 .2vw .5vw rgba(0,0,0,.15)}
-.bub.think::after{bottom:-.75vw;width:.75vw;height:.75vw;margin-left:-.15vw}
-.bub.think::before{bottom:-1.25vw;width:.4vw;height:.4vw;margin-left:.35vw}
+  box-shadow:0 calc(.2*var(--u)) calc(.5*var(--u)) rgba(0,0,0,.15)}
+.bub.think::after{bottom:calc(-.75*var(--u));width:calc(.75*var(--u));height:calc(.75*var(--u));margin-left:calc(-.15*var(--u))}
+.bub.think::before{bottom:calc(-1.25*var(--u));width:calc(.4*var(--u));height:calc(.4*var(--u));margin-left:calc(.35*var(--u))}
 /* 고양이가 짜증 나서 달아날 때 머리 위에 뜨는 만화식 꼬불꼬불 낙서 뭉치 (말풍선 없이) */
 /* 말풍선 안에 꼬불꼬불 낙서, 그 오른쪽 위에 작은 빨간 핏줄 표시(💢) */
-.bub.grr{padding:.75vw 1.05vw .6vw .9vw}
-.grr svg{display:block;width:2.6vw;animation:grr .16s steps(2) infinite}
+.bub.grr{padding:calc(.75*var(--u)) calc(1.05*var(--u)) calc(.6*var(--u)) calc(.9*var(--u))}
+.grr svg{display:block;width:calc(2.6*var(--u));animation:grr .16s steps(2) infinite}
 /* ChatGPT 짜증 말풍선 그림(작은동명/짜증_1.png 핏줄, 짜증_2.png 낙서, 짜증_3.png 화난 고양이 얼굴) — 그림 자체에 말풍선·꼬리가 있어 바탕·꼬리를 뺌 */
 .bub.grrimg{background:none;box-shadow:none;padding:0}
 .bub.grrimg::after{display:none}
-.bub.grrimg img{display:block;width:4.4vw;animation:grr .18s steps(2) infinite}
-.grr svg.vein{position:absolute;right:.8vw;top:.5vw;width:1.05vw;animation-duration:.22s}
+.bub.grrimg img{display:block;width:calc(4.4*var(--u));animation:grr .18s steps(2) infinite}
+.grr svg.vein{position:absolute;right:calc(.8*var(--u));top:calc(.5*var(--u));width:calc(1.05*var(--u));animation-duration:.22s}
 @keyframes grr{0%{transform:rotate(-6deg) translate(-2%,0)}100%{transform:rotate(6deg) translate(2%,-3%)}}
-.bub::after{content:'';position:absolute;left:50%;bottom:-.9vw;margin-left:-.8vw;border:.8vw solid transparent;border-top-color:#fff;border-bottom:0}
+.bub::after{content:'';position:absolute;left:50%;bottom:calc(-.9*var(--u));margin-left:calc(-.8*var(--u));border:calc(.8*var(--u)) solid transparent;border-top-color:#fff;border-bottom:0}
 .lab{position:absolute;transform:translate(-50%,-100%) scale(.6);pointer-events:none;white-space:nowrap;z-index:2;
-  padding:.7vw 1.5vw;border-radius:99vw;background:#fff;color:#12357F;font-size:1.6vw;font-weight:700;
-  box-shadow:0 .5vw 1.5vw rgba(0,0,0,.22);opacity:0;transition:opacity .25s,transform .3s cubic-bezier(.3,1.6,.5,1)}
+  padding:calc(.7*var(--u)) calc(1.5*var(--u));border-radius:calc(99*var(--u));background:#fff;color:#12357F;font-size:calc(1.6*var(--u));font-weight:700;
+  box-shadow:0 calc(.5*var(--u)) calc(1.5*var(--u)) rgba(0,0,0,.22);opacity:0;transition:opacity .25s,transform .3s cubic-bezier(.3,1.6,.5,1)}
 .lab.on{opacity:1;transform:translate(-50%,-100%) scale(1)}
 
 /* 아래 떠 있는 버튼들 — 흰색 75% 반투명 (뒤 흐림 효과는 4K에서 무거워서 쓰지 않음) */
-.reach{position:absolute;left:2vw;right:2vw;bottom:1.4vw;display:flex;align-items:center;gap:1vw;pointer-events:none;z-index:4}
+.reach{position:absolute;left:calc(2*var(--u));right:calc(2*var(--u));bottom:calc(1.4*var(--u));display:flex;align-items:center;gap:calc(1*var(--u));pointer-events:none;z-index:4}
 .reach>*{pointer-events:auto}
-.glass{background:rgba(255,255,255,.75);box-shadow:0 .4vw 1.4vw rgba(60,30,20,.16);color:#12357F}
+.glass{background:rgba(255,255,255,.75);box-shadow:0 calc(.4*var(--u)) calc(1.4*var(--u)) rgba(60,30,20,.16);color:#12357F}
 button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
-.btn{padding:1.5vw 2.6vw;border-radius:99vw;font-size:1.5vw;font-weight:500;white-space:nowrap}
+.btn{padding:calc(1.5*var(--u)) calc(2.6*var(--u));border-radius:calc(99*var(--u));font-size:calc(1.5*var(--u));font-weight:500;white-space:nowrap}
 .btn:active,.chips button:active{background:rgba(255,255,255,.95)}
-.grp{display:flex;align-items:center;gap:.7vw;padding:.6vw .7vw .6vw 1.6vw;border-radius:99vw}
-.grp .lb{font-size:1.15vw;font-weight:500;color:rgba(18,53,127,.7);margin-right:.3vw}
-.chips{display:flex;gap:.6vw}
-.chips button{padding:1.1vw 1.9vw;border-radius:99vw;font-size:1.3vw;font-weight:500;color:#12357F}
+.grp{display:flex;align-items:center;gap:calc(.7*var(--u));padding:calc(.6*var(--u)) calc(.7*var(--u)) calc(.6*var(--u)) calc(1.6*var(--u));border-radius:calc(99*var(--u))}
+.grp .lb{font-size:calc(1.15*var(--u));font-weight:500;color:rgba(18,53,127,.7);margin-right:calc(.3*var(--u))}
+.chips{display:flex;gap:calc(.6*var(--u))}
+.chips button{padding:calc(1.1*var(--u)) calc(1.9*var(--u));border-radius:calc(99*var(--u));font-size:calc(1.3*var(--u));font-weight:500;color:#12357F}
 .chips button.sel{background:var(--c4);color:#221a08;font-weight:700}
 .chips button[disabled]{opacity:.35}
 .spacer{flex:1}
 /* 소나기 — 화면을 살짝 어둡게 하고 비스듬한 빗줄기 */
 #rain{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:2;opacity:0;transition:opacity 1.5s;background:rgba(60,75,110,.24)}
 #rain.on{opacity:1}
-#rain i{position:absolute;top:-12vh;width:.16vw;height:4.5vw;background:linear-gradient(transparent,rgba(150,180,225,.95));
+#rain i{position:absolute;top:-12vh;width:calc(.16*var(--u));height:calc(4.5*var(--u));background:linear-gradient(transparent,rgba(150,180,225,.95));
   transform:rotate(12deg);animation:rainfall linear infinite}
 @keyframes rainfall{to{transform:translate3d(-14vh,125vh,0) rotate(12deg)}}
 /* 눈싸움 눈뭉치 — 그림 좌표(#world) 안에서 날아감 */
 .snowball{position:absolute;left:0;top:0;width:3.2px;height:3.2px;border-radius:50%;background:#fff;
   box-shadow:0 0 0 .35px rgba(110,130,170,.7);pointer-events:none}
 /* 숨은 재미 발견 알림 — 조작줄 바로 위 가운데에 잠깐 */
-#toast{position:absolute;left:50%;bottom:8.6vw;transform:translate(-50%,1vw);padding:1vw 2.2vw;border-radius:99vw;
-  font-size:1.5vw;font-weight:700;white-space:nowrap;opacity:0;pointer-events:none;z-index:5;transition:opacity .3s,transform .3s}
+#toast{position:absolute;left:50%;bottom:calc(8.6*var(--u));transform:translate(-50%,calc(1*var(--u)));padding:calc(1*var(--u)) calc(2.2*var(--u));border-radius:calc(99*var(--u));
+  font-size:calc(1.5*var(--u));font-weight:700;white-space:nowrap;opacity:0;pointer-events:none;z-index:5;transition:opacity .3s,transform .3s}
 #toast.on{opacity:1;transform:translate(-50%,0)}
 /* 숨은 재미 찾은 수 — 오른쪽 위 구석. 찾을 때마다 점이 하나씩 채워지고 살짝 커졌다 돌아옴 (2026-10-29 사용자 요청: 도전 의식) */
-#funs{position:absolute;right:2vw;top:1.6vw;z-index:3;pointer-events:none;padding:1vw 1.6vw 1.1vw;border-radius:1vw;text-align:right}
-#funs .t{font-size:1.3vw;font-weight:500;color:rgba(18,53,127,.8)}
-#funs .t b{font-family:var(--serif);font-size:2.4vw;font-weight:700;color:#12357F;margin:0 .3vw 0 .5vw}
-#funs .dots{display:flex;gap:.45vw;justify-content:flex-end;margin-top:.5vw}
-#funs .dots i{width:.9vw;height:.9vw;border-radius:50%;border:.15vw solid rgba(18,53,127,.45)}
+#funs{position:absolute;right:calc(2*var(--u));top:calc(1.6*var(--u));z-index:3;pointer-events:none;padding:calc(1*var(--u)) calc(1.6*var(--u)) calc(1.1*var(--u));border-radius:calc(1*var(--u));text-align:right}
+#funs .t{font-size:calc(1.3*var(--u));font-weight:500;color:rgba(18,53,127,.8)}
+#funs .t b{font-family:var(--serif);font-size:calc(2.4*var(--u));font-weight:700;color:#12357F;margin:0 calc(.3*var(--u)) 0 calc(.5*var(--u))}
+#funs .dots{display:flex;gap:calc(.45*var(--u));justify-content:flex-end;margin-top:calc(.5*var(--u))}
+#funs .dots i{width:calc(.9*var(--u));height:calc(.9*var(--u));border-radius:50%;border:calc(.15*var(--u)) solid rgba(18,53,127,.45)}
 #funs .dots i.on{background:var(--c4);border-color:#d9a400}
 #funs.pop{animation:pop .6s ease-out}
 @keyframes pop{30%{transform:scale(1.15)}}
+/* 휴대폰 — 글자·버튼 크기 단위 --u 가 최소 11px 이라 큰 화면처럼 한 줄에 다 안 들어감.
+   폭 700px 이하에서는 계절 버튼을 윗줄 가운데로, 처음 모습·닫기를 아랫줄 양끝으로 (2026-10-30) */
+@media (max-width:700px){
+  .reach{flex-wrap:wrap;row-gap:calc(1*var(--u))}
+  .reach .grp{order:-1;flex:1 0 100%;justify-content:center}
+  #toast{bottom:calc(15*var(--u))}
+}
 </style>
 </head>
 <body>
@@ -313,7 +320,7 @@ const PROPS={
 /* 눌렀을 때 말풍선에 빨간 하트를 띄우는 소품 — 사물이라 말 대신 하트 (사용자 요청) */
 const PROPHEART=new Set(['겨울_0','겨울_5']);
 /* 입체 하트 — 왼쪽 위에서 빛: 밝은 빨강→어두운 빨강 그라데이션 + 가장자리 어둡게 + 반짝이 + 아래 그림자 (2026-10-24 사용자 요청) */
-const HEART='<svg viewBox="0 0 32 28" style="display:block;width:2vw;overflow:visible;filter:drop-shadow(0 .12vw .1vw rgba(120,0,10,.45))"><defs>'+
+const HEART='<svg viewBox="0 0 32 28" style="display:block;width:calc(2*var(--u));overflow:visible;filter:drop-shadow(0 .12vw .1vw rgba(120,0,10,.45))"><defs>'+
   '<radialGradient id="hg" cx=".34" cy=".3" r=".8"><stop offset="0" stop-color="#ff8a8f"/><stop offset=".45" stop-color="#e5383b"/><stop offset="1" stop-color="#9d0b1c"/></radialGradient>'+
   '<radialGradient id="hs" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>'+
   '<path d="M16 27C6 19 1 14 1 8.5 1 4.4 4.3 1 8.4 1c3.1 0 5.4 1.7 7.6 4.6C18.2 2.7 20.5 1 23.6 1 27.7 1 31 4.4 31 8.5 31 14 26 19 16 27z" fill="url(#hg)" stroke="#8a0a18" stroke-width=".6" stroke-opacity=".5"/>'+
@@ -1181,14 +1188,19 @@ function poke(k){
 const reactFrame=k=>k.reactT-k.react<.8||k.react<.5?5:0;
 
 /* ── 보기: 그림 전체가 화면에 들어오는 크기 = 1배, 최대 3배 (2026-10-24 사용자 요청, 2.4 → 3) ──
+   휴대폰은 1배가 원본의 1/4 정도라 3배로도 작아서, 원본의 1.6배 크기까지는 확대되게 (2026-10-30).
    화면 전체를 쓰되, 그림 y 945(경영고 앞)까지는 아래 버튼 줄 위에 오게 — 그 아래 받침대 테두리만 버튼 뒤로 들어감.
-   그림이 화면보다 낮을 때는 위에 붙임 */
-const V={z:1,cx:768,cy:512},HOME={z:1,cx:768,cy:0};let fit=1;
+   그림이 화면보다 낮을 때는 위에 붙임.
+   세로 휴대폰은 1배면 그림이 위에 얇게 붙고 아래가 비어서, 처음 모습은 그림이 화면 높이를 채우는 크기로 — 좌우는 밀어서 봄 */
+const U=()=>Math.max(innerWidth*.01,11);   /* CSS --u 와 같은 값 */
+const V={z:1,cx:768,cy:512},HOME={z:1,cx:768,cy:0};let fit=1,ZMAX=3,first=true;
 const KEEP=945;
 function layout(){
   const r=$('stage').getBoundingClientRect(),bar=$('reach').getBoundingClientRect().top-r.top-r.width*.006;
   fit=Math.min(r.width/1536,r.height/1024,bar/KEEP);
-  V.z=Math.max(1,Math.min(3,V.z));
+  ZMAX=Math.max(3,1.6/fit);HOME.z=Math.min(ZMAX,Math.min(r.height/1024,bar/KEEP)/fit);
+  if(first){first=false;V.z=HOME.z}
+  V.z=Math.max(1,Math.min(ZMAX,V.z));
   const s=fit*V.z,hw=r.width/2/s,hh=r.height/2/s;
   V.cx=hw>=768?768:Math.max(hw,Math.min(1536-hw,V.cx));V.cy=hh>=512?hh:Math.max(hh,Math.min(1024-hh,V.cy));
   $('world').style.transform=`translate(${r.width/2-V.cx*s}px,${r.height/2-V.cy*s}px) scale(${s})`;
@@ -1212,7 +1224,7 @@ stage.addEventListener('pointermove',e=>{
   const p=ptr.get(e.pointerId);if(!p)return;const dx=e.clientX-p.x,dy=e.clientY-p.y;p.x=e.clientX;p.y=e.clientY;
   const s=fit*V.z;
   if(ptr.size===1&&!multi){V.cx-=dx/s;V.cy-=dy/s;layout()}
-  else if(ptr.size===2&&g2){const [a,b]=[...ptr.values()];V.z=Math.max(1,Math.min(3,g2.z*Math.hypot(a.x-b.x,a.y-b.y)/Math.max(1,g2.d)));
+  else if(ptr.size===2&&g2){const [a,b]=[...ptr.values()];V.z=Math.max(1,Math.min(ZMAX,g2.z*Math.hypot(a.x-b.x,a.y-b.y)/Math.max(1,g2.d)));
     const r=stage.getBoundingClientRect(),s2=fit*V.z,mx=(a.x+b.x)/2-r.left,my=(a.y+b.y)/2-r.top;
     V.cx=g2.w[0]-(mx-r.width/2)/s2;V.cy=g2.w[1]-(my-r.height/2)/s2;layout()}
 });
@@ -1227,7 +1239,7 @@ stage.addEventListener('wheel',e=>{e.preventDefault();V.z*=e.deltaY>0?1/1.1:1.1;
 function tap(sx,sy){eggUsed=false;tapAt(sx,sy);if(!eggUsed){eggKey=null;eggN=0}}
 function tapAt(sx,sy){
   /* 학생 먼저 — 손가락 둘레 화면 폭 2.5% 안의 가장 가까운 학생 */
-  const r=stage.getBoundingClientRect(),lim=r.width*.025;let best=null,bd=1e9;
+  const r=stage.getBoundingClientRect(),lim=Math.max(r.width*.025,24);let best=null,bd=1e9;
   for(const k of kids){if(k.mode==='in'||k.off)continue;const s=scaleAt(k.y),[x,y]=toScreen(k.x,k.y-(k.h||KH)*.5*s);const d=Math.hypot(x+r.left-sx,y+r.top-sy);if(d<lim&&d<bd){bd=d;best=k}}
   /* 옛 선배가 손가락 둘레에 있으면 옆을 지나는 학생보다 선배가 먼저 대답 — 선배 멘트(OLDSAY)만 나오게 */
   if(senior&&!senior.dead){const s=scaleAt(senior.y),[x,y]=toScreen(senior.x,senior.y-KH*.5*s);const d=Math.hypot(x+r.left-sx,y+r.top-sy);if(d<lim){bd=d;best=senior}}
@@ -1247,7 +1259,7 @@ function tapAt(sx,sy){
 }
 function stepOverlay(dt){
   /* 말풍선 꼬리(.bub::after, 0.9vw)만큼 더 올려서 꼬리 끝이 머리 위에 오게 — 꼬리가 고양이·학생을 가리지 않게 */
-  const now=performance.now(),TAIL=innerWidth*.009;
+  const now=performance.now(),TAIL=U()*.9;
   SPOTS.forEach((S,i)=>{const on=now<labUntil[i];labs[i].classList.toggle('on',on);
     const [x,y]=toScreen((S[1]+S[3])/2,S[5]??S[2]+10);labs[i].style.left=x+'px';labs[i].style.top=y+'px'});
   if(cat&&cat.bub){const s=scaleAt(cat.y),g=cat.bub.classList.contains('grrimg'),[x,y]=toScreen(cat.x,cat.y-(g?CATH*.95:CATH+2)*s);
@@ -1272,7 +1284,7 @@ function closeMe(){if(parent!==window)parent.postMessage({lego:'close'},'*');els
 (()=>{const b=$('closeBtn');let down=null;
   b.addEventListener('pointerdown',e=>{down=e.pointerId;try{b.setPointerCapture(e.pointerId)}catch(_){}});
   b.addEventListener('pointerup',e=>{if(e.pointerId!==down)return;down=null;
-    const r=b.getBoundingClientRect(),m=innerWidth*.02;
+    const r=b.getBoundingClientRect(),m=U()*2;
     if(e.clientX>r.left-m&&e.clientX<r.right+m&&e.clientY>r.top-m&&e.clientY<r.bottom+m)closeMe()});
   b.addEventListener('pointercancel',()=>down=null);
   b.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' ')closeMe()});
