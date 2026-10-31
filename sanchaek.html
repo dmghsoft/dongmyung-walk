@@ -1195,8 +1195,12 @@ const reactFrame=k=>k.reactT-k.react<.8||k.react<.5?5:0;
 const U=()=>Math.max(innerWidth*.01,11);   /* CSS --u 와 같은 값 */
 const V={z:1,cx:768,cy:512},HOME={z:1,cx:768,cy:0};let fit=1,ZMAX=3,first=true;
 const KEEP=945;
+/* 화면·버튼 줄 위치는 창 크기가 바뀔 때만 다시 잼 — 손가락이 움직일 때마다 재면 학생이 움직이는 중이라 브라우저가 매번 화면 배치를 새로 계산해 느렸음 (2026-10-31) */
+let RECT=null;
+const stageRect=()=>RECT||(RECT={r:$('stage').getBoundingClientRect(),bt:$('reach').getBoundingClientRect().top});
+window.addEventListener('resize',()=>{RECT=null},true);
 function layout(){
-  const r=$('stage').getBoundingClientRect(),bar=$('reach').getBoundingClientRect().top-r.top-r.width*.006;
+  const {r,bt}=stageRect(),bar=bt-r.top-r.width*.006;
   fit=Math.min(r.width/1536,r.height/1024,bar/KEEP);
   ZMAX=Math.max(3,1.6/fit);HOME.z=Math.min(ZMAX,Math.min(r.height/1024,bar/KEEP)/fit);
   if(first){first=false;V.z=HOME.z}
@@ -1205,8 +1209,8 @@ function layout(){
   V.cx=hw>=768?768:Math.max(hw,Math.min(1536-hw,V.cx));V.cy=hh>=512?hh:Math.max(hh,Math.min(1024-hh,V.cy));
   $('world').style.transform=`translate(${r.width/2-V.cx*s}px,${r.height/2-V.cy*s}px) scale(${s})`;
 }
-const toScreen=(x,y)=>{const r=$('stage').getBoundingClientRect(),s=fit*V.z;return [r.width/2+(x-V.cx)*s,r.height/2+(y-V.cy)*s]};
-const toWorld=(sx,sy)=>{const r=$('stage').getBoundingClientRect(),s=fit*V.z;return [V.cx+(sx-r.left-r.width/2)/s,V.cy+(sy-r.top-r.height/2)/s]};
+const toScreen=(x,y)=>{const r=stageRect().r,s=fit*V.z;return [r.width/2+(x-V.cx)*s,r.height/2+(y-V.cy)*s]};
+const toWorld=(sx,sy)=>{const r=stageRect().r,s=fit*V.z;return [V.cx+(sx-r.left-r.width/2)/s,V.cy+(sy-r.top-r.height/2)/s]};
 let anim=null;
 function animTo(z,cx,cy){anim={z,cx,cy}}
 function viewHome(){animTo(HOME.z,HOME.cx,HOME.cy);ping()}
@@ -1214,26 +1218,46 @@ function viewHome(){animTo(HOME.z,HOME.cx,HOME.cy);ping()}
 /* multi: 이번 터치에서 두 손가락을 썼는지 — 쓴 뒤에는 손가락을 모두 뗄 때까지 끌기·누르기 안 함
    (확대·축소 후 한 손가락이 늦게 떨어지면 화면이 그 손가락을 따라가던 문제, 2026-10-29) */
 const ptr=new Map();let g2=null,multi=false;const stage=$('stage');
+/* 졸업앨범 확대와 같은 방식 (2026-10-31 사용자: 산책 확대·축소가 앨범보다 덜 부드러움)
+   ① 손가락 움직임은 1초에 수십~백여 번 — 화면 한 장(1/60초)에 한 번만 그림
+   ② 만지는 동안 그림판(#world)을 GPU 에 올려 두고 늘리기만(will-change) — 손가락을 다 떼면 내려서 그 크기로 한 번 또렷하게 다시 그림 */
+let raf=0;
+const want=()=>{if(!raf)raf=requestAnimationFrame(()=>{raf=0;layout()})};
+const live=on=>{$('world').style.willChange=on?'transform':''};
 stage.addEventListener('pointerdown',e=>{
   stage.setPointerCapture(e.pointerId);ptr.set(e.pointerId,{x:e.clientX,y:e.clientY,x0:e.clientX,y0:e.clientY,t:performance.now()});
-  stage.classList.add('drag');anim=null;ping();
+  stage.classList.add('drag');anim=null;ping();live(true);
   if(ptr.size>=2)multi=true;
   if(ptr.size===2){const [a,b]=[...ptr.values()];g2={d:Math.hypot(a.x-b.x,a.y-b.y),z:V.z,w:toWorld((a.x+b.x)/2,(a.y+b.y)/2)}}
 });
 stage.addEventListener('pointermove',e=>{
   const p=ptr.get(e.pointerId);if(!p)return;const dx=e.clientX-p.x,dy=e.clientY-p.y;p.x=e.clientX;p.y=e.clientY;
   const s=fit*V.z;
-  if(ptr.size===1&&!multi){V.cx-=dx/s;V.cy-=dy/s;layout()}
+  if(ptr.size===1&&!multi){V.cx-=dx/s;V.cy-=dy/s;want()}
   else if(ptr.size===2&&g2){const [a,b]=[...ptr.values()];V.z=Math.max(1,Math.min(ZMAX,g2.z*Math.hypot(a.x-b.x,a.y-b.y)/Math.max(1,g2.d)));
-    const r=stage.getBoundingClientRect(),s2=fit*V.z,mx=(a.x+b.x)/2-r.left,my=(a.y+b.y)/2-r.top;
-    V.cx=g2.w[0]-(mx-r.width/2)/s2;V.cy=g2.w[1]-(my-r.height/2)/s2;layout()}
+    const r=stageRect().r,s2=fit*V.z,mx=(a.x+b.x)/2-r.left,my=(a.y+b.y)/2-r.top;
+    V.cx=g2.w[0]-(mx-r.width/2)/s2;V.cy=g2.w[1]-(my-r.height/2)/s2;want()}
 });
+/* 누르기로 보는 범위 — 화면 폭 1.2%(4K 46px) 안에서, 0.7초 안에 뗀 것. 예전 18px·0.5초는 4K 터치 화면에서 손가락이 조금만 떨려도
+   누르기가 아닌 끌기로 쳐져 학생 터치가 안 먹었음 (2026-10-31 키오스크: 계절·마우스는 되는데 닫기·학생 터치가 안 됨) */
+const TAPR=()=>Math.max(18,innerWidth*.012);
+let lastUp={t:-1e9,tapped:false,moved:false};
 function endPtr(e){
   const p=ptr.get(e.pointerId);if(!p)return;ptr.delete(e.pointerId);if(ptr.size<2)g2=null;
-  const wasMulti=multi;if(!ptr.size){stage.classList.remove('drag');multi=false}
-  if(!wasMulti&&Math.hypot(e.clientX-p.x0,e.clientY-p.y0)<18&&performance.now()-p.t<500)tap(e.clientX,e.clientY);
+  const wasMulti=multi;if(!ptr.size){stage.classList.remove('drag');multi=false;
+    if(raf){cancelAnimationFrame(raf);raf=0}layout();live(false)}
+  const moved=wasMulti||Math.hypot(e.clientX-p.x0,e.clientY-p.y0)>=TAPR();
+  const ok=!moved&&performance.now()-p.t<700;
+  lastUp={t:performance.now(),tapped:ok,moved};
+  if(ok)tap(e.clientX,e.clientY);
 }
 stage.addEventListener('pointerup',endPtr);stage.addEventListener('pointercancel',endPtr);
+/* 보조 경로 — 키오스크 터치에서 pointerup 으로 누르기가 잡히지 않아도, 계절 버튼처럼 click 은 들어오므로 click 으로 한 번 더 받음.
+   방금 pointerup 으로 처리했거나 끌기였으면 건너뜀 (같은 누르기를 두 번 처리하지 않게) */
+stage.addEventListener('click',e=>{
+  if(performance.now()-lastUp.t<800&&(lastUp.tapped||lastUp.moved))return;
+  ping();tap(e.clientX,e.clientY);
+});
 stage.addEventListener('wheel',e=>{e.preventDefault();V.z*=e.deltaY>0?1/1.1:1.1;layout();ping()},{passive:false});
 ['contextmenu','selectstart','dragstart','gesturestart'].forEach(t=>window.addEventListener(t,e=>e.preventDefault(),true));
 function tap(sx,sy){eggUsed=false;tapAt(sx,sy);if(!eggUsed){eggKey=null;eggN=0}}
@@ -1288,6 +1312,8 @@ function closeMe(){if(parent!==window)parent.postMessage({lego:'close'},'*');els
     if(e.clientX>r.left-m&&e.clientX<r.right+m&&e.clientY>r.top-m&&e.clientY<r.bottom+m)closeMe()});
   b.addEventListener('pointercancel',()=>down=null);
   b.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' ')closeMe()});
+  /* 보조 경로 — 키오스크 터치에서 pointerup 이 안 잡혀도 click 으로 닫힘 (두 번 불려도 index5 의 closeLego 가 한 번만 닫음, 2026-10-31) */
+  b.addEventListener('click',closeMe);
   /* 키오스크 밖(웹에 올려 따로 열었을 때)에는 돌아갈 메뉴가 없으니 닫기 버튼을 숨김 (2026-10-30). 키오스크에선 늘 index5 안(iframe) */
   if(parent===window)b.style.display='none';
 })();
