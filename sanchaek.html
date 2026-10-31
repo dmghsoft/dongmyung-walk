@@ -410,7 +410,7 @@ function buildKids(){
   for(let i=0;i<2;i++){const k=makeKid('jog',[0,0]);k.ang=i*Math.PI;k.speed=34}
   /* 수다 떠는 친구 셋 (가끔 'ㅋㅋ' 같은 짧은 말풍선) */
   for(const [x,y,f] of [[382,548,1],[408,540,-1],[400,560,-1]]){const k=makeKid('chat',[x,y]);k.face=f;k.chatT=0}
-  makeKid('wave',[930,430]);
+  {const k=makeKid('wave',[930,430]);k.hx=930;k.hy=430;k.wt=1+rnd()*2;k.speed=13}
   /* 동상 계단 양옆 벤치 — 운동장(오른쪽 아래)을 바라보고 앉은 학생 */
   for(const [x,y] of BENCHES){
     const im=document.createElement('img');im.src='작은동명/의자_칸.png';
@@ -437,8 +437,8 @@ function stepKids(dt){
     if(k.mode==='sit'){if(k.react>0){setFrame(k,reactFrame(k),false);k.y=k.sy+4}else{setFrame(k,6,true);k.y=k.sy;
       if(k.sitT!==undefined&&(k.sitT-=dt)<=0)standUp(k)}place(k);continue}
     if(k.mode==='stroll'){stepStroll(k,dt);place(k);continue}
-    if(k.mode==='wave'){place(k);continue}
     if(k.react>0){setFrame(k,reactFrame(k),k.face>0);k.spr.style.marginBottom='0px';place(k);continue}
+    if(k.mode==='wave'){stepWave(k,dt);continue}
     if(k.mode==='chat'){                        /* 수다 — 서로 마주 보고, 말할 때 손짓 (무슨 말을 할지는 stepTalk) */
       k.chatT-=dt;setFrame(k,k.chatT>0?5:0,k.face>0);
       place(k);continue}
@@ -694,7 +694,7 @@ function stepSports(dt){
       if(k.done){setFrame(k,P.winner?0:5,k.face>0);k.spr.style.marginBottom='0px';
         if(!P.winner){P.winner=k;say(k,'1등!',3);P.wt=0;
           /* 1초 뒤 운동장 가운데에 이긴 팀 발표 — 팀 이름은 팀 색으로 */
-          const w=k.team;setTimeout(()=>{if(sports)propSay(TRACK.cx+20,TRACK.cy+10,'',
+          const w=k.team;setTimeout(()=>{if(!sports)return;propSay(TRACK.cx+20,TRACK.cy+10,'',   /* 그 사이 체육대회가 끝났으면(처음 모습으로 돌아감 등) 띄우지 않음 */
             `<b style="color:${w?'#6b7280':'#2f6fd6'}">${w?'백팀':'청팀'}</b> 승리!`,4);pbubs.at(-1).b.classList.add('notail')},1000)}}
       else{k.ph+=dt;walkFrame(k,k.y-y0,.07)}
       place(k);
@@ -1009,6 +1009,18 @@ function showFuns(pop){
 function found(k){if(got.has(k))return;got.add(k);showFuns(true);
   toast(got.size===Object.keys(FUNS).length?'숨은 재미를 모두 찾았어요!':`숨은 재미 발견! '${FUNS[k]}'`)}
 
+/* 운동장 손 흔드는 학생 — 제자리(hx,hy) 둘레 60px 안을 천천히 거닐다가, 멈출 때 열에 다섯 번쯤 2~3초 손 들고 서 있음 */
+function stepWave(k,dt){
+  if(k.wt>0){k.wt-=dt;setFrame(k,k.waving?5:0,k.face>0);k.spr.style.marginBottom='0px';
+    if(k.wt<=0){k.waving=false;
+      for(let i=0;i<40;i++){const t=rnd()*6.283,r=20+rnd()*40,x=k.hx+Math.cos(t)*r,y=k.hy+Math.sin(t)*r*.5;
+        if(inField(x,y)&&!inStage(x,y)&&!crossesStage(k.x,k.y,x,y)){k.tx=x;k.ty=y;break}}}
+    place(k);return}
+  const dx=k.tx-k.x,dy=k.ty-k.y,d=Math.hypot(dx,dy);
+  if(d<1){k.waving=rnd()<.5;k.wt=k.waving?2+rnd():.8+rnd()*1.5;if(k.waving)k.face=-1;place(k);return}
+  const v=Math.min(d,k.speed*scaleAt(k.y)*dt);k.x+=dx/d*v;k.y+=dy/d*v;if(Math.abs(dx)>.5)k.face=dx<0?-1:1;
+  k.ph+=dt;walkFrame(k,dy,.16);place(k);
+}
 /* 걸음 그림 — 아래로 가면 앞모습(걷기A·서기·걷기B·서기), 위로 가면 뒷모습(걷기A·B). iv = 한 발 시간 */
 function walkFrame(k,dy,iv){
   const L=k.face<0,f4=Math.floor(k.ph/iv)%4;
@@ -1207,6 +1219,8 @@ function layout(){
   V.z=Math.max(1,Math.min(ZMAX,V.z));
   const s=fit*V.z,hw=r.width/2/s,hh=r.height/2/s;
   V.cx=hw>=768?768:Math.max(hw,Math.min(1536-hw,V.cx));V.cy=hh>=512?hh:Math.max(hh,Math.min(1024-hh,V.cy));
+  /* 그림이 아래 버튼 줄 위 공간보다 작으면(세로 휴대폰에서 축소했을 때 등) 위에 붙이지 않고 그 공간 가운데에 */
+  if(1024*s<bar)V.cy=(r.height/2-bar/2)/s+512;
   $('world').style.transform=`translate(${r.width/2-V.cx*s}px,${r.height/2-V.cy*s}px) scale(${s})`;
 }
 const toScreen=(x,y)=>{const r=stageRect().r,s=fit*V.z;return [r.width/2+(x-V.cx)*s,r.height/2+(y-V.cy)*s]};
