@@ -129,7 +129,7 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 #funs.pop{animation:pop .6s ease-out}
 @keyframes pop{30%{transform:scale(1.15)}}
 /* 휴대폰 — 글자·버튼 크기 단위 --u 가 최소 11px 이라 큰 화면처럼 한 줄에 다 안 들어감.
-   폭 700px 이하에서는 계절 버튼을 윗줄 가운데로, 처음 모습·닫기를 아랫줄 양끝으로 (2026-10-30) */
+   폭 700px 이하에서는 계절 버튼을 윗줄 가운데로, 닫기를 아랫줄로 (2026-10-30. 처음 모습 버튼은 2026-11-01 사용자 요청으로 없앰) */
 @media (max-width:700px){
   .reach{flex-wrap:wrap;row-gap:calc(1*var(--u))}
   .reach .grp{order:-1;flex:1 0 100%;justify-content:center}
@@ -145,7 +145,6 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
   <div id="fall"></div>
 </div>
 <div class="reach" id="reach">
-  <button class="btn glass" onclick="viewHome()">처음 모습</button>
   <div class="spacer"></div>
   <div class="grp glass"><span class="lb">계절</span><div class="chips" id="seasons"></div></div>
   <div class="spacer"></div>
@@ -1209,18 +1208,21 @@ const V={z:1,cx:768,cy:512},HOME={z:1,cx:768,cy:0};let fit=1,ZMAX=3,first=true;
 const KEEP=945;
 /* 화면·버튼 줄 위치는 창 크기가 바뀔 때만 다시 잼 — 손가락이 움직일 때마다 재면 학생이 움직이는 중이라 브라우저가 매번 화면 배치를 새로 계산해 느렸음 (2026-10-31) */
 let RECT=null;
-const stageRect=()=>RECT||(RECT={r:$('stage').getBoundingClientRect(),bt:$('reach').getBoundingClientRect().top});
+const stageRect=()=>RECT||(RECT={r:$('stage').getBoundingClientRect(),bt:$('reach').getBoundingClientRect().top,
+  hb:Math.max(document.querySelector('.head').getBoundingClientRect().bottom,$('funs').getBoundingClientRect().bottom)});
 window.addEventListener('resize',()=>{RECT=null},true);
 function layout(){
-  const {r,bt}=stageRect(),bar=bt-r.top-r.width*.006;
+  const {r,bt,hb}=stageRect(),bar=bt-r.top-r.width*.006,top=hb-r.top;
   fit=Math.min(r.width/1536,r.height/1024,bar/KEEP);
   ZMAX=Math.max(3,1.6/fit);HOME.z=Math.min(ZMAX,Math.min(r.height/1024,bar/KEEP)/fit);
   if(first){first=false;V.z=HOME.z}
   V.z=Math.max(1,Math.min(ZMAX,V.z));
   const s=fit*V.z,hw=r.width/2/s,hh=r.height/2/s;
   V.cx=hw>=768?768:Math.max(hw,Math.min(1536-hw,V.cx));V.cy=hh>=512?hh:Math.max(hh,Math.min(1024-hh,V.cy));
-  /* 그림이 아래 버튼 줄 위 공간보다 작으면(세로 휴대폰에서 축소했을 때 등) 위에 붙이지 않고 그 공간 가운데에 */
-  if(1024*s<bar)V.cy=(r.height/2-bar/2)/s+512;
+  /* 그림이 아래 버튼 줄 위 공간보다 작으면(세로 휴대폰에서 축소했을 때 등) 위에 붙이지 않고 가운데에 —
+     위 제목 상자와 아래 계절 버튼 사이에 들어가면 그 사이 가운데, 아니면 버튼 줄 위 공간 가운데 */
+  if(1024*s<bar-top)V.cy=(r.height/2-(top+bar)/2)/s+512;
+  else if(1024*s<bar)V.cy=(r.height/2-bar/2)/s+512;
   $('world').style.transform=`translate(${r.width/2-V.cx*s}px,${r.height/2-V.cy*s}px) scale(${s})`;
 }
 const toScreen=(x,y)=>{const r=stageRect().r,s=fit*V.z;return [r.width/2+(x-V.cx)*s,r.height/2+(y-V.cy)*s]};
